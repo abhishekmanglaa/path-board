@@ -205,6 +205,12 @@ body::before {
   font-size:clamp(15px,2.4vmin,28px); color:var(--sub);
   position:relative; z-index:1; margin-top:.55em; letter-spacing:.03em;
 }
+.w-extra {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(13px,2vmin,22px); color:var(--sub);
+  position:relative; z-index:1; margin-top:.35em; letter-spacing:.03em;
+  opacity:.8;
+}
 
 /* ── FOOTER (slim) ──────────────────────────────────────────────── */
 .foot {
@@ -265,6 +271,7 @@ body::before {
         <div class="w-temp" id="w-temp">--<sup>°</sup></div>
         <div class="w-cond" id="w-cond">—</div>
         <div class="w-range" id="w-range"></div>
+        <div class="w-extra" id="w-extra"></div>
       </div>
     </div>
 
@@ -400,21 +407,44 @@ const WMO = {
 async function loadWeather() {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
-      + `&current=temperature_2m,weather_code`
+      + `&current=temperature_2m,weather_code,wind_speed_10m`
+      + `&hourly=precipitation_probability`
       + `&daily=temperature_2m_max,temperature_2m_min`
-      + `&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=1`;
+      + `&timezone=America%2FNew_York&forecast_days=1`;
     const res = await fetch(url, { cache:"no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const w = await res.json();
     const temp = Math.round(w?.current?.temperature_2m);
     const code = w?.current?.weather_code;
+    const wind = Math.round(w?.current?.wind_speed_10m);
     const hi = Math.round(w?.daily?.temperature_2m_max?.[0]);
     const lo = Math.round(w?.daily?.temperature_2m_min?.[0]);
+
+    let rainTxt = "";
+    const times = w?.hourly?.time, probs = w?.hourly?.precipitation_probability;
+    if (times && probs) {
+      const now = new Date();
+      let best = -1, bestIdx = -1;
+      for (let i=0; i<times.length; i++) {
+        if (new Date(times[i]) < now) continue;
+        if (probs[i] > best) { best = probs[i]; bestIdx = i; }
+      }
+      if (bestIdx >= 0 && best > 0) {
+        const hour = new Date(times[bestIdx]).toLocaleTimeString("en-US",
+          { hour:"numeric", hour12:true, timeZone:"America/New_York" });
+        rainTxt = `${best}% rain at ${hour}`;
+      }
+    }
+
     if (!isNaN(temp)) {
       document.getElementById("w-temp").innerHTML = temp + "<sup>°</sup>";
       document.getElementById("w-cond").textContent = WMO[code] || "—";
       if (!isNaN(hi) && !isNaN(lo))
         document.getElementById("w-range").textContent = `H ${hi}°  ·  L ${lo}°`;
+      const extra = [];
+      if (rainTxt) extra.push(rainTxt);
+      if (!isNaN(wind)) extra.push(`Wind ${wind} km/h`);
+      document.getElementById("w-extra").textContent = extra.join("  ·  ");
     }
   } catch(e) { console.warn("weather failed:", e.message); }
 }
