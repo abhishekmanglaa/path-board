@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Newport PATH</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Newport PATH" />
+<meta name="theme-color" content="#040810" id="tc" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
+
+<style>
+:root[data-theme="dark"] {
+  --bg:#040810;
+  --tile-alpha:.17; --tile-border:.40;
+  --glass-hi:rgba(255,255,255,.17);
+  --shadow:0 12px 48px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.3);
+  --ink:#FFFFFF;
+  --sub:rgba(255,255,255,.58);
+  --ghost:rgba(255,255,255,.28);
+  --foot-bg:rgba(255,255,255,.04);
+  --foot-edge:rgba(255,255,255,.07);
+  --stale:#E8913C;
+  color-scheme:dark;
+}
+:root[data-theme="light"] {
+  --bg:#F0F4FA;
+  --tile-alpha:.13; --tile-border:.32;
+  --glass-hi:rgba(255,255,255,.82);
+  --shadow:0 6px 32px rgba(8,24,60,.13), 0 1px 4px rgba(8,24,60,.07);
+  --ink:#0A1628;
+  --sub:rgba(10,22,40,.58);
+  --ghost:rgba(10,22,40,.28);
+  --foot-bg:rgba(255,255,255,.55);
+  --foot-edge:rgba(10,22,40,.08);
+  --stale:#C9700A;
+  color-scheme:light;
+}
+:root { --amber:#FFB000; }
+
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }
+html, body { height:100% }
+body {
+  background:var(--bg); background-attachment:fixed;
+  font-family:"Barlow Semi Condensed", system-ui, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+  font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
+}
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none;
+  background:
+    radial-gradient(40% 42% at 18% 26%, rgba(101,193,0,.11) 0%, transparent 68%),
+    radial-gradient(38% 40% at 56% 26%, rgba(255,153,0,.10) 0%, transparent 68%),
+    radial-gradient(38% 40% at 18% 74%, rgba(101,193,0,.09) 0%, transparent 68%),
+    radial-gradient(40% 42% at 56% 74%, rgba(255,153,0,.10) 0%, transparent 68%),
+    radial-gradient(34% 80% at 90% 50%, rgba(255,176,0,.07) 0%, transparent 70%);
+}
+:root[data-theme="light"] body::before { opacity:.55 }
+
+#app {
+  position:relative; z-index:1;
+  height:100%; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* ── GRID: 4 train tiles (2×2) + right rail (time / weather) ───── */
+.board {
+  flex:1; min-height:0;
+  display:grid;
+  grid-template-columns:1.15fr 1.15fr .85fr;
+  grid-template-rows:1fr 1fr;
+  gap:clamp(10px,1.5vmin,18px);
+  padding:clamp(10px,1.5vmin,18px);
+  padding-bottom:0;
+}
+#tile-time    { grid-column:3; grid-row:1 }
+#tile-weather { grid-column:3; grid-row:2 }
+
+@media (orientation:portrait) {
+  .board {
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:1fr 1fr .62fr;
+  }
+  #tile-time    { grid-column:1; grid-row:3 }
+  #tile-weather { grid-column:2; grid-row:3 }
+}
+
+/* ── GLASS TILE ─────────────────────────────────────────────────── */
+.tile {
+  --rgb:120,120,120;
+  position:relative; overflow:hidden;
+  border-radius:clamp(20px,3.2vmin,30px);
+  padding:clamp(16px,2.4vmin,32px) clamp(18px,2.6vmin,34px);
+  display:flex; flex-direction:column;
+  background:linear-gradient(160deg,
+    rgba(var(--rgb), calc(var(--tile-alpha) + .08)) 0%,
+    rgba(var(--rgb), var(--tile-alpha))              50%,
+    rgba(var(--rgb), calc(var(--tile-alpha) - .04)) 100%);
+  backdrop-filter:blur(28px) saturate(200%);
+  -webkit-backdrop-filter:blur(28px) saturate(200%);
+  border:1.5px solid rgba(var(--rgb), var(--tile-border));
+  border-top-color:var(--glass-hi);
+  box-shadow:var(--shadow), 0 0 60px -20px rgba(var(--rgb), .5);
+  color:var(--ink);
+}
+.tile::before {
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(152deg,
+    rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 30%, transparent 55%);
+}
+.tile::after {
+  content:""; position:absolute; right:-12%; bottom:-22%;
+  width:60%; height:60%; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle, rgba(var(--rgb),.22) 0%, transparent 70%);
+}
+
+/* ── TRAIN TILE CONTENT — everything bigger ─────────────────────── */
+.dest {
+  font-family:"Barlow Condensed",sans-serif;
+  font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; line-height:.95;
+  font-size:clamp(42px,8.5vmin,104px);
+  position:relative; z-index:1;
+}
+.headsign {
+  margin-top:.3em; color:var(--sub);
+  font-weight:400; font-size:clamp(14px,2.2vmin,26px);
+  letter-spacing:.04em; position:relative; z-index:1;
+}
+.next {
+  flex:1; display:flex; align-items:center;
+  gap:.12em; min-height:0; position:relative; z-index:1;
+}
+.mins {
+  font-weight:700; line-height:.76; letter-spacing:-.03em;
+  font-size:clamp(88px,24vmin,270px);
+}
+.unit {
+  font-family:"Barlow Condensed",sans-serif; font-weight:600;
+  text-transform:uppercase; letter-spacing:.08em;
+  color:var(--sub); font-size:clamp(19px,3.2vmin,40px);
+  align-self:flex-end; margin-bottom:.5em;
+}
+.due { color:rgb(var(--rgb)); filter:brightness(1.28) saturate(1.1) }
+:root[data-theme="light"] .due { filter:brightness(.78) saturate(1.3) }
+.pulse { animation:pulse 1.6s ease-in-out infinite }
+@keyframes pulse { 50%{opacity:.38} }
+
+.then {
+  color:var(--sub); font-weight:400;
+  font-size:clamp(21px,3.6vmin,44px);
+  letter-spacing:.02em; min-height:1.2em;
+  position:relative; z-index:1;
+  padding-top:clamp(4px,.6vmin,8px);
+}
+.then .eta {
+  color:var(--ink); font-weight:600; opacity:.92;
+  font-size:clamp(25px,4.2vmin,52px);
+}
+.then .miss { color:var(--ghost); text-decoration:line-through }
+.then .dot  { color:var(--ghost); margin:0 .4em }
+.empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
+
+/* ── TIME TILE ──────────────────────────────────────────────────── */
+#tile-time { --rgb:255,176,0; justify-content:center; align-items:center; text-align:center }
+.t-hm {
+  font-family:"Barlow",sans-serif; font-weight:300;
+  font-size:clamp(64px,13.5vmin,160px); line-height:.9;
+  letter-spacing:-.02em; color:var(--ink);
+  position:relative; z-index:1;
+}
+.t-sec {
+  font-family:"Barlow",sans-serif; font-weight:300;
+  font-size:clamp(22px,4vmin,48px); color:var(--sub);
+  position:relative; z-index:1; margin-top:.22em;
+}
+.t-date {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(16px,2.6vmin,30px); color:var(--sub);
+  letter-spacing:.1em; text-transform:uppercase;
+  position:relative; z-index:1; margin-top:.85em;
+}
+
+/* ── WEATHER TILE ───────────────────────────────────────────────── */
+#tile-weather { --rgb:55,138,221; justify-content:center; align-items:center; text-align:center }
+.w-temp {
+  font-family:"Barlow",sans-serif; font-weight:300;
+  font-size:clamp(64px,13.5vmin,160px); line-height:.9;
+  letter-spacing:-.02em; color:var(--ink);
+  position:relative; z-index:1;
+}
+.w-temp sup { font-size:.45em; font-weight:300; vertical-align:.5em }
+.w-cond {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(19px,3.2vmin,38px); color:var(--ink); opacity:.85;
+  position:relative; z-index:1; margin-top:.3em;
+}
+.w-range {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(15px,2.4vmin,28px); color:var(--sub);
+  position:relative; z-index:1; margin-top:.55em; letter-spacing:.03em;
+}
+
+/* ── FOOTER (slim) ──────────────────────────────────────────────── */
+.foot {
+  flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(8px,1.2vmin,14px) clamp(18px,2.8vmin,32px);
+  padding-bottom:max(clamp(8px,1.2vmin,14px), env(safe-area-inset-bottom));
+  background:var(--foot-bg);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--foot-edge);
+}
+.status { display:flex; align-items:center; gap:.5em }
+.led-dot {
+  width:.55em; height:.55em; border-radius:50%;
+  background:#44D07A; box-shadow:0 0 7px #44D07A; flex-shrink:0;
+}
+.is-stale .led-dot { background:var(--stale); box-shadow:0 0 7px var(--stale) }
+.status-txt {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(12px,1.5vmin,15px); letter-spacing:.04em;
+  color:var(--ghost);
+}
+.badge {
+  background:var(--amber); color:#080808;
+  font-weight:700; text-transform:uppercase;
+  letter-spacing:.1em; padding:.2em .55em;
+  border-radius:5px; font-size:.86em;
+}
+.badge[hidden] { display:none }
+#theme-toggle {
+  background:none; border:none; cursor:pointer;
+  padding:.18em .4em; font-size:clamp(15px,2vmin,21px);
+  color:var(--ghost); border-radius:6px; line-height:1; transition:color .2s;
+}
+#theme-toggle:hover { color:var(--ink) }
+
+#night {
+  position:fixed; inset:0; background:#000;
+  opacity:0; pointer-events:none;
+  transition:opacity 2s ease; z-index:50;
+}
+@media (prefers-reduced-motion:reduce) {
+  .pulse { animation:none }
+  #night { transition:none }
+}
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="board" id="board">
+      <!-- 4 train tiles injected by JS -->
+      <div class="tile" id="tile-time">
+        <div class="t-hm" id="t-hm">--:--</div>
+        <div class="t-sec" id="t-sec">--</div>
+        <div class="t-date" id="t-date">—</div>
+      </div>
+      <div class="tile" id="tile-weather">
+        <div class="w-temp" id="w-temp">--<sup>°</sup></div>
+        <div class="w-cond" id="w-cond">—</div>
+        <div class="w-range" id="w-range"></div>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <span class="status">
+        <span class="led-dot"></span>
+        <span class="status-txt" id="updated">connecting…</span>
+        <span class="badge" id="demoBadge" hidden>Demo</span>
+      </span>
+      <button id="theme-toggle" title="Toggle light / dark">◑</button>
+    </footer>
+  </div>
+  <div id="night"></div>
+
+<script>
+/* ── THEME ──────────────────────────────────────────────────────── */
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  document.getElementById("tc").content = t === "dark" ? "#040810" : "#F0F4FA";
+}
+let forced = null;
+applyTheme(window.matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
+window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change", e => {
+  if (!forced) applyTheme(e.matches ? "dark" : "light");
+});
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  forced = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(forced);
+});
+
+/* ── CONFIG ─────────────────────────────────────────────────────── */
+const CONFIG = {
+  API_BASE:        "https://path.abhishekmangla59.workers.dev",
+  POLL_SECONDS:    10,
+  WALK_MINUTES:    6,
+  NIGHT_DIM_START: 23,
+  NIGHT_DIM_END:   6,
+  NIGHT_DIM_OPACITY: 0.55,
+
+  // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
+  LAT: 40.7270, LON: -74.0335,
+  WEATHER_MINUTES: 10,      // weather refresh cadence
+
+  TILES: [
+    { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, fallbackRGB:"101,193,0" },
+    { label:"33 St",      sub:"33rd Street",        dir:"TO_NY", match:/33|thirty/i,       fallbackRGB:"255,153,0" },
+    { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        fallbackRGB:"101,193,0" },
+    { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         fallbackRGB:"255,153,0" },
+  ],
+};
+
+/* ── BUILD TRAIN TILES ──────────────────────────────────────────── */
+let trains = [], lastGood = 0, usingDemo = false;
+
+const board = document.getElementById("board");
+const timeTile = document.getElementById("tile-time");
+CONFIG.TILES.forEach((t, i) => {
+  const el = document.createElement("div");
+  el.className = "tile"; el.id = "tile" + i;
+  el.style.setProperty("--rgb", t.fallbackRGB);
+  el.innerHTML = `
+    <div class="dest">${t.label}</div>
+    <div class="headsign">${t.sub}</div>
+    <div class="next"><span class="mins">—</span><span class="unit"></span></div>
+    <div class="then"></div>`;
+  board.insertBefore(el, timeTile);
+});
+
+function hexToRGB(hex) {
+  const h = hex.replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(h)) return null;
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)].join(",");
+}
+
+/* ── FETCH TRAINS ───────────────────────────────────────────────── */
+async function load() {
+  try {
+    const res = await fetch(CONFIG.API_BASE, { cache:"no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!lastGood && !usingDemo) console.log("PATH feed:", data);
+    trains = normalize(data);
+    if (trains.length) { lastGood = Date.now(); usingDemo = false; toggleDemo(false); }
+    else throw new Error("empty");
+  } catch(err) {
+    console.warn("fetch failed:", err.message);
+    if (!lastGood) { trains = demo(); usingDemo = true; toggleDemo(true); lastGood = Date.now(); }
+  }
+}
+
+function normalize(data) {
+  const list = data?.upcomingTrains || data?.trains || data?.stations?.[0]?.upcomingTrains || [];
+  const out = [];
+  for (const t of list) {
+    const dir  = (t.direction || t.routeDirection || "").toUpperCase();
+    const sign = t.headsign || t.headSign || t.lineName || t.routeDisplayName || "";
+    const arr  = parseArrival(t);
+    if (!arr) continue;
+    const color = (Array.isArray(t.lineColors) && t.lineColors[0])
+                ? t.lineColors[0]
+                : (t.lineColor ? "#" + String(t.lineColor).replace(/^#/,"") : null);
+    const idx = CONFIG.TILES.findIndex(tile => dir.includes(tile.dir) && tile.match.test(sign));
+    if (idx === -1) continue;
+    out.push({ destIdx:idx, arrival:arr, color });
+  }
+  return out;
+}
+
+function parseArrival(t) {
+  const iso = t.projectedArrival || t.arrivalTime || t.expectedArrival;
+  if (iso) { const d = new Date(iso); if (!isNaN(d)) return d; }
+  const s = t.secondsToArrival ?? t.eta;
+  if (s != null && s !== "") { const n = parseInt(s,10); if (!isNaN(n)) return new Date(Date.now()+n*1000); }
+  const m = /(\d+)\s*min/i.exec(t.arrivalTimeMessage||"");
+  if (m) return new Date(Date.now() + parseInt(m[1],10)*60000);
+  if (/now|due|board/i.test(t.arrivalTimeMessage||"")) return new Date();
+  return null;
+}
+
+/* ── WEATHER (Open-Meteo — no key, CORS-friendly) ───────────────── */
+const WMO = {
+  0:"Clear", 1:"Mostly clear", 2:"Partly cloudy", 3:"Overcast",
+  45:"Fog", 48:"Fog", 51:"Drizzle", 53:"Drizzle", 55:"Drizzle",
+  56:"Freezing drizzle", 57:"Freezing drizzle",
+  61:"Light rain", 63:"Rain", 65:"Heavy rain",
+  66:"Freezing rain", 67:"Freezing rain",
+  71:"Light snow", 73:"Snow", 75:"Heavy snow", 77:"Snow",
+  80:"Showers", 81:"Showers", 82:"Heavy showers",
+  85:"Snow showers", 86:"Snow showers",
+  95:"Thunderstorm", 96:"Thunderstorm", 99:"Thunderstorm",
+};
+
+async function loadWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
+      + `&current=temperature_2m,weather_code`
+      + `&daily=temperature_2m_max,temperature_2m_min`
+      + `&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=1`;
+    const res = await fetch(url, { cache:"no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const w = await res.json();
+    const temp = Math.round(w?.current?.temperature_2m);
+    const code = w?.current?.weather_code;
+    const hi = Math.round(w?.daily?.temperature_2m_max?.[0]);
+    const lo = Math.round(w?.daily?.temperature_2m_min?.[0]);
+    if (!isNaN(temp)) {
+      document.getElementById("w-temp").innerHTML = temp + "<sup>°</sup>";
+      document.getElementById("w-cond").textContent = WMO[code] || "—";
+      if (!isNaN(hi) && !isNaN(lo))
+        document.getElementById("w-range").textContent = `H ${hi}°  ·  L ${lo}°`;
+    }
+  } catch(e) { console.warn("weather failed:", e.message); }
+}
+
+/* ── RENDER ─────────────────────────────────────────────────────── */
+function render() {
+  const now = Date.now();
+  const d = new Date();
+
+  // time tile
+  const hm = d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})
+              .replace(/\s[AP]M$/i,"");
+  const apm = d.getHours() >= 12 ? "PM" : "AM";
+  document.getElementById("t-hm").textContent = hm;
+  document.getElementById("t-sec").textContent =
+    ":" + String(d.getSeconds()).padStart(2,"0") + " " + apm;
+  document.getElementById("t-date").textContent =
+    d.toLocaleDateString("en-US",{weekday:"short", month:"short", day:"numeric"});
+
+  // train tiles
+  CONFIG.TILES.forEach((_, i) => {
+    const el = document.getElementById("tile" + i);
+    const mine = trains
+      .map(t => ({...t, mins: Math.round((t.arrival - now)/60000)}))
+      .filter(t => t.destIdx === i && t.mins >= 0)
+      .sort((a,b) => a.mins - b.mins)
+      .slice(0, 5);
+
+    const minsEl = el.querySelector(".mins");
+    const unitEl = el.querySelector(".unit");
+    const thenEl = el.querySelector(".then");
+
+    if (!mine.length) {
+      el.classList.add("empty");
+      minsEl.textContent = "—"; minsEl.className = "mins";
+      unitEl.textContent = ""; thenEl.innerHTML = "";
+      return;
+    }
+    el.classList.remove("empty");
+
+    if (mine[0].color) {
+      const rgb = hexToRGB(mine[0].color);
+      if (rgb) el.style.setProperty("--rgb", rgb);
+    }
+
+    const first = mine[0];
+    minsEl.className = "mins";
+    if (first.mins <= 0) {
+      minsEl.textContent = "Due"; minsEl.classList.add("due","pulse"); unitEl.textContent = "";
+    } else {
+      minsEl.textContent = first.mins; unitEl.textContent = "min";
+      minsEl.style.opacity = first.mins < CONFIG.WALK_MINUTES ? ".38" : "1";
+    }
+
+    const eta = first.arrival.toLocaleTimeString("en-US",
+      { hour:"numeric", minute:"2-digit", hour12:true });
+    const more = mine.slice(1).map(t => {
+      const txt = t.mins <= 0 ? "Due" : t.mins + " min";
+      return `<span class="${t.mins < CONFIG.WALK_MINUTES ? "miss":""}">${txt}</span>`;
+    });
+    thenEl.innerHTML = [`<span class="eta">${eta}</span>`, ...more]
+      .join('<span class="dot">·</span>');
+  });
+
+  // footer status
+  const stale = lastGood && (Date.now()-lastGood)/1000 > CONFIG.POLL_SECONDS * 3;
+  document.getElementById("app").classList.toggle("is-stale", !!stale);
+  const upd = document.getElementById("updated");
+  if (!lastGood) upd.textContent = "connecting…";
+  else if (stale) upd.textContent = "stale";
+  else upd.textContent = "live";
+
+  applyNight();
+}
+
+function toggleDemo(on) { document.getElementById("demoBadge").hidden = !on; }
+
+function applyNight() {
+  const h = new Date().getHours();
+  const {NIGHT_DIM_START:s, NIGHT_DIM_END:e} = CONFIG;
+  const night = s===e ? false : (s<e ? h>=s&&h<e : h>=s||h<e);
+  document.getElementById("night").style.opacity = night ? CONFIG.NIGHT_DIM_OPACITY : 0;
+}
+
+/* ── KEEP AWAKE ─────────────────────────────────────────────────── */
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") { keepAwake(); load(); loadWeather(); }
+});
+
+/* ── DEMO ───────────────────────────────────────────────────────── */
+function demo() {
+  const m = n => new Date(Date.now()+n*60000);
+  return [
+    {destIdx:0,arrival:m(4), color:"#65C100"},{destIdx:0,arrival:m(11),color:"#65C100"},{destIdx:0,arrival:m(19),color:"#65C100"},
+    {destIdx:1,arrival:m(2), color:"#FF9900"},{destIdx:1,arrival:m(9), color:"#FF9900"},{destIdx:1,arrival:m(17),color:"#FF9900"},
+    {destIdx:2,arrival:m(0), color:"#65C100"},{destIdx:2,arrival:m(14),color:"#65C100"},{destIdx:2,arrival:m(24),color:"#65C100"},
+    {destIdx:3,arrival:m(7), color:"#FF9900"},{destIdx:3,arrival:m(18),color:"#FF9900"},
+  ];
+}
+
+/* ── PWA ────────────────────────────────────────────────────────── */
+const manifest = {name:"Newport PATH",short_name:"Newport PATH",display:"fullscreen",
+  orientation:"any",background_color:"#040810",theme_color:"#040810",start_url:"."};
+const ml = document.createElement("link");
+ml.rel = "manifest";
+ml.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/json"}));
+document.head.appendChild(ml);
+
+keepAwake(); load(); loadWeather(); render();
+setInterval(render, 1000);
+setInterval(load, CONFIG.POLL_SECONDS * 1000);
+setInterval(loadWeather, CONFIG.WEATHER_MINUTES * 60 * 1000);
+</script>
+</body>
+</html>
