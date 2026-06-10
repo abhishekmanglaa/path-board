@@ -404,6 +404,14 @@ function normalize(data) {
     if (idx === -1) continue;
     const viaHoboken = /via\s+hoboken/i.test(sign);
     out.push({ destIdx:idx, arrival:arr, viaHoboken });
+
+    // Overnight/weekend: a "33rd St via Hoboken" train stops at Hoboken
+    // (the next stop after Newport) before continuing on, so it also
+    // counts as a Hoboken-bound departure.
+    if (viaHoboken && CONFIG.TILES[idx].label === "33 St") {
+      const hobokenIdx = CONFIG.TILES.findIndex(tile => tile.label === "Hoboken");
+      out.push({ destIdx:hobokenIdx, arrival:arr, viaHoboken:false });
+    }
   }
   return out;
 }
