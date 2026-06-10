@@ -181,6 +181,7 @@ body::before {
   font-size:clamp(25px,4.2vmin,52px);
 }
 .then .miss { color:var(--ghost); text-decoration:line-through }
+.then .sched { opacity:.6; font-style:italic }
 .then .dot  { color:var(--ghost); margin:0 .4em }
 .empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
 
@@ -346,6 +347,11 @@ const CONFIG = {
   NIGHT_DIM_START: 23,
   NIGHT_DIM_END:   6,
   NIGHT_DIM_OPACITY: 0.55,
+
+  // PATH's consolidated overnight/weekend line runs roughly every 20 min;
+  // used to project later departures the live feed doesn't report yet.
+  SCHEDULED_HEADWAY_MINUTES: 20,
+  DEPARTURES_SHOWN: 3,
 
   // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
   LAT: 40.7270, LON: -74.0335,
@@ -573,9 +579,22 @@ function render() {
 
     const eta = first.arrival.toLocaleTimeString("en-US",
       { hour:"numeric", minute:"2-digit", hour12:true });
-    const more = mine.slice(1).map(t => {
-      const txt = t.mins <= 0 ? "Due" : t.mins + " min";
-      return `<span class="${t.mins < CONFIG.WALK_MINUTES ? "miss":""}">${txt}</span>`;
+
+    // Pad with scheduled (estimated) departures, spaced by the
+    // consolidated-line headway, when the live feed gives us fewer
+    // than DEPARTURES_SHOWN real arrivals.
+    const upcoming = mine.slice();
+    while (upcoming.length < CONFIG.DEPARTURES_SHOWN) {
+      const last = upcoming[upcoming.length - 1];
+      const arrival = new Date(last.arrival.getTime() + CONFIG.SCHEDULED_HEADWAY_MINUTES * 60000);
+      upcoming.push({ arrival, mins: Math.round((arrival - now)/60000), scheduled:true });
+    }
+
+    const more = upcoming.slice(1, CONFIG.DEPARTURES_SHOWN).map(t => {
+      const txt = (t.mins <= 0 ? "Due" : t.mins + " min") + (t.scheduled ? "*" : "");
+      const cls = [t.mins < CONFIG.WALK_MINUTES ? "miss" : "", t.scheduled ? "sched" : ""]
+        .filter(Boolean).join(" ");
+      return `<span class="${cls}">${txt}</span>`;
     });
     thenEl.innerHTML = [`<span class="eta">${eta}</span>`, ...more]
       .join('<span class="dot">·</span>');
