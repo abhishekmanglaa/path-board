@@ -199,9 +199,9 @@ body::before {
   position:relative; z-index:1; margin-top:.22em;
 }
 .t-date {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(16px,2.6vmin,30px); color:var(--sub);
-  letter-spacing:.1em; text-transform:uppercase;
+  font-family:"Barlow",sans-serif; font-weight:700;
+  font-size:clamp(26px,5.4vmin,64px); color:var(--sub);
+  letter-spacing:.08em; text-transform:uppercase;
   position:relative; z-index:1; margin-top:.85em;
 }
 
@@ -236,6 +236,23 @@ body::before {
   position:relative; z-index:1; margin-top:.35em; letter-spacing:.03em;
   opacity:.8;
 }
+.w-tomorrow {
+  display:flex; align-items:center; justify-content:center; gap:.5em;
+  position:relative; z-index:1; margin-top:.7em;
+  padding-top:.6em; border-top:1px solid rgba(var(--rgb),.25);
+}
+.w-tomorrow[hidden] { display:none }
+.w-tomorrow .w-tom-icon {
+  width:clamp(20px,3.6vmin,40px); height:clamp(20px,3.6vmin,40px);
+  color:var(--sub); opacity:.85; flex-shrink:0;
+}
+.w-tomorrow .w-tom-icon svg { width:100%; height:100%; display:block }
+.w-tomorrow .w-tom-text {
+  font-family:"Barlow",sans-serif; font-weight:600;
+  font-size:clamp(14px,2.2vmin,24px); color:var(--sub);
+  letter-spacing:.03em;
+}
+.w-tomorrow .w-tom-text b { color:var(--ink); font-weight:700 }
 
 /* ── FOOTER (slim) ──────────────────────────────────────────────── */
 .foot {
@@ -308,6 +325,10 @@ body::before {
         <div class="w-cond" id="w-cond">—</div>
         <div class="w-range" id="w-range"></div>
         <div class="w-extra" id="w-extra"></div>
+        <div class="w-tomorrow" id="w-tomorrow" hidden>
+          <div class="w-tom-icon" id="w-tom-icon"></div>
+          <div class="w-tom-text" id="w-tom-text"></div>
+        </div>
       </div>
     </div>
 
@@ -356,6 +377,7 @@ const CONFIG = {
   // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
   LAT: 40.7270, LON: -74.0335,
   WEATHER_MINUTES: 10,      // weather refresh cadence
+  WEATHER_TOMORROW_HOUR: 20, // show tomorrow's forecast from 8pm onward
 
   TILES: [
     { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, rgb:"101,193,0" },
@@ -485,8 +507,8 @@ async function loadWeather() {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
       + `&current=temperature_2m,weather_code,wind_speed_10m`
       + `&hourly=precipitation_probability`
-      + `&daily=temperature_2m_max,temperature_2m_min`
-      + `&timezone=America%2FNew_York&forecast_days=1`;
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
+      + `&timezone=America%2FNew_York&forecast_days=2`;
     const res = await fetch(url, { cache:"no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const w = await res.json();
@@ -522,6 +544,21 @@ async function loadWeather() {
       if (rainTxt) extra.push(rainTxt);
       if (!isNaN(wind)) extra.push(`Wind ${wind} km/h`);
       document.getElementById("w-extra").textContent = extra.join("  ·  ");
+
+      // Late at night, also show tomorrow's forecast.
+      const tomorrowEl = document.getElementById("w-tomorrow");
+      const tomCode = w?.daily?.weather_code?.[1];
+      const tomHi = Math.round(w?.daily?.temperature_2m_max?.[1]);
+      const tomLo = Math.round(w?.daily?.temperature_2m_min?.[1]);
+      if (new Date().getHours() >= CONFIG.WEATHER_TOMORROW_HOUR
+          && !isNaN(tomHi) && !isNaN(tomLo)) {
+        document.getElementById("w-tom-icon").innerHTML = WMO_ICON[tomCode] || ICON_SUN;
+        document.getElementById("w-tom-text").innerHTML =
+          `Tomorrow: ${WMO[tomCode] || "—"}, <b>H ${tomHi}°</b> · L ${tomLo}°`;
+        tomorrowEl.hidden = false;
+      } else {
+        tomorrowEl.hidden = true;
+      }
     }
   } catch(e) { console.warn("weather failed:", e.message); }
 }
