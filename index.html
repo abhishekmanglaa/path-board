@@ -118,6 +118,11 @@ body::before {
   width:60%; height:60%; border-radius:50%; pointer-events:none;
   background:radial-gradient(circle, rgba(var(--rgb),.22) 0%, transparent 70%);
 }
+/* alternate the corner glow for the bottom row so vertically-stacked
+   tiles sharing a line color (WTC/Hoboken, 33rd/JSQ) read as distinct */
+.tile:nth-child(3)::after, .tile:nth-child(4)::after {
+  right:auto; left:-12%; bottom:auto; top:-22%;
+}
 
 /* ── TRAIN TILE CONTENT — everything bigger ─────────────────────── */
 .dest {
@@ -135,10 +140,19 @@ body::before {
 .next {
   flex:1; display:flex; align-items:center;
   gap:.12em; min-height:0; position:relative; z-index:1;
+  perspective:600px;
 }
 .mins {
   font-weight:700; line-height:.76; letter-spacing:-.03em;
   font-size:clamp(88px,24vmin,270px);
+  display:inline-block; transform-style:preserve-3d; backface-visibility:hidden;
+}
+.mins.flip { animation:flipDigit .6s ease; }
+@keyframes flipDigit {
+  0%   { transform:rotateX(0deg);    opacity:1 }
+  45%  { transform:rotateX(-100deg); opacity:.25 }
+  55%  { transform:rotateX(100deg);  opacity:.25 }
+  100% { transform:rotateX(0deg);    opacity:1 }
 }
 .unit {
   font-family:"Barlow Condensed",sans-serif; font-weight:600;
@@ -150,6 +164,10 @@ body::before {
 :root[data-theme="light"] .due { filter:brightness(.78) saturate(1.3) }
 .pulse { animation:pulse 1.6s ease-in-out infinite }
 @keyframes pulse { 50%{opacity:.38} }
+.tile:has(.due) { animation:tileGlow 1.6s ease-in-out infinite }
+@keyframes tileGlow {
+  50% { box-shadow:var(--shadow), 0 0 90px -10px rgba(var(--rgb),.9) }
+}
 
 .then {
   color:var(--sub); font-weight:400;
@@ -188,6 +206,12 @@ body::before {
 
 /* ── WEATHER TILE ───────────────────────────────────────────────── */
 #tile-weather { --rgb:55,138,221; justify-content:center; align-items:center; text-align:center }
+.w-icon {
+  width:clamp(40px,7.5vmin,84px); height:clamp(40px,7.5vmin,84px);
+  margin:0 auto .15em; color:var(--ink); opacity:.9;
+  position:relative; z-index:1;
+}
+.w-icon svg { width:100%; height:100%; display:block }
 .w-temp {
   font-family:"Barlow",sans-serif; font-weight:600;
   font-size:clamp(64px,13.5vmin,160px); line-height:.9;
@@ -252,8 +276,18 @@ body::before {
   opacity:0; pointer-events:none;
   transition:opacity 2s ease; z-index:50;
 }
+/* ── GRAIN OVERLAY (subtle texture, breaks up flat gradients) ────── */
+#grain {
+  position:fixed; inset:0; pointer-events:none; z-index:40;
+  opacity:.05; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:180px 180px;
+}
+:root[data-theme="light"] #grain { opacity:.035; mix-blend-mode:multiply }
 @media (prefers-reduced-motion:reduce) {
   .pulse { animation:none }
+  .mins.flip { animation:none }
+  .tile:has(.due) { animation:none }
   #night { transition:none }
 }
 </style>
@@ -268,6 +302,7 @@ body::before {
         <div class="t-date" id="t-date">—</div>
       </div>
       <div class="tile" id="tile-weather">
+        <div class="w-icon" id="w-icon"></div>
         <div class="w-temp" id="w-temp">--<sup>°</sup></div>
         <div class="w-cond" id="w-cond">—</div>
         <div class="w-range" id="w-range"></div>
@@ -285,6 +320,7 @@ body::before {
     </footer>
   </div>
   <div id="night"></div>
+  <div id="grain"></div>
 
 <script>
 /* ── THEME ──────────────────────────────────────────────────────── */
@@ -404,6 +440,24 @@ const WMO = {
   95:"Thunderstorm", 96:"Thunderstorm", 99:"Thunderstorm",
 };
 
+/* line-art icons matching the board's stroke aesthetic */
+const ICON_SUN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>`;
+const ICON_PARTLY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M9 1.5v1.3M9 13.7V15M2.5 8h1.3M14.7 8H16M4.6 3.6l.9.9M12.4 3.6l-.9.9"/><path d="M16.5 19a3 3 0 0 0 0-6 4.3 4.3 0 0 0-8 1.3A3.5 3.5 0 0 0 9 19h7.5Z"/></svg>`;
+const ICON_CLOUD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 18a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 18h11Z"/></svg>`;
+const ICON_FOG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13M3 12h18M3 16h13"/></svg>`;
+const ICON_RAIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 14a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 14h11Z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg>`;
+const ICON_SNOW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 13a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 13h11Z"/><path d="M8 17v4M8 19l-1.5 1M8 19l1.5 1M12 17v4M12 19l-1.5 1M12 19l1.5 1M16 17v4M16 19l-1.5 1M16 19l1.5 1"/></svg>`;
+const ICON_THUNDER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 12.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 12.5h11Z"/><path d="M13 12l-3 5h3l-2 4"/></svg>`;
+const WMO_ICON = {
+  0:ICON_SUN, 1:ICON_SUN, 2:ICON_PARTLY, 3:ICON_CLOUD,
+  45:ICON_FOG, 48:ICON_FOG,
+  51:ICON_RAIN, 53:ICON_RAIN, 55:ICON_RAIN, 56:ICON_RAIN, 57:ICON_RAIN,
+  61:ICON_RAIN, 63:ICON_RAIN, 65:ICON_RAIN, 66:ICON_RAIN, 67:ICON_RAIN,
+  80:ICON_RAIN, 81:ICON_RAIN, 82:ICON_RAIN,
+  71:ICON_SNOW, 73:ICON_SNOW, 75:ICON_SNOW, 77:ICON_SNOW, 85:ICON_SNOW, 86:ICON_SNOW,
+  95:ICON_THUNDER, 96:ICON_THUNDER, 99:ICON_THUNDER,
+};
+
 async function loadWeather() {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
@@ -439,6 +493,7 @@ async function loadWeather() {
     if (!isNaN(temp)) {
       document.getElementById("w-temp").innerHTML = temp + "<sup>°</sup>";
       document.getElementById("w-cond").textContent = WMO[code] || "—";
+      document.getElementById("w-icon").innerHTML = WMO_ICON[code] || ICON_SUN;
       if (!isNaN(hi) && !isNaN(lo))
         document.getElementById("w-range").textContent = `H ${hi}°  ·  L ${lo}°`;
       const extra = [];
@@ -479,7 +534,7 @@ function render() {
 
     if (!mine.length) {
       el.classList.add("empty");
-      minsEl.textContent = "—"; minsEl.className = "mins";
+      minsEl.textContent = "—"; minsEl.className = "mins"; minsEl.dataset.val = "";
       unitEl.textContent = ""; thenEl.innerHTML = "";
       return;
     }
@@ -491,13 +546,17 @@ function render() {
     }
 
     const first = mine[0];
-    minsEl.className = "mins";
+    let val, due = false;
     if (first.mins <= 0) {
-      minsEl.textContent = "Due"; minsEl.classList.add("due","pulse"); unitEl.textContent = "";
+      val = "Due"; due = true; unitEl.textContent = "";
     } else {
-      minsEl.textContent = first.mins; unitEl.textContent = "min";
-      minsEl.style.opacity = first.mins < CONFIG.WALK_MINUTES ? ".38" : "1";
+      val = String(first.mins); unitEl.textContent = "min";
     }
+    const changed = minsEl.dataset.val !== undefined && minsEl.dataset.val !== val;
+    minsEl.className = "mins" + (due ? " due pulse" : "") + (changed ? " flip" : "");
+    minsEl.dataset.val = val;
+    minsEl.textContent = val;
+    minsEl.style.opacity = (!due && first.mins < CONFIG.WALK_MINUTES) ? ".38" : "";
 
     const eta = first.arrival.toLocaleTimeString("en-US",
       { hour:"numeric", minute:"2-digit", hour12:true });
