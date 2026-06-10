@@ -392,6 +392,21 @@ async function load() {
   }
 }
 
+// PATH consolidates to a single line through Hoboken on weekday overnights
+// (Mon-Thu 11PM-6AM, continuing into Fri morning) and weekends (Fri-Sun
+// 9PM-10AM, continuing into Sat/Sun/Mon morning). Used as a fallback for
+// detecting "via Hoboken" routing when the live feed's headsign doesn't
+// spell it out.
+function isCollapsedSchedule(d = new Date()) {
+  const day  = d.getDay(); // 0=Sun .. 6=Sat
+  const hour = d.getHours() + d.getMinutes() / 60;
+  const weekdayNight   = day >= 1 && day <= 4 && hour >= 23;
+  const weekdayMorning = day >= 2 && day <= 5 && hour < 6;
+  const weekendNight   = (day === 5 || day === 6 || day === 0) && hour >= 21;
+  const weekendMorning = (day === 6 || day === 0 || day === 1) && hour < 10;
+  return weekdayNight || weekdayMorning || weekendNight || weekendMorning;
+}
+
 function normalize(data) {
   const list = data?.upcomingTrains || data?.trains || data?.stations?.[0]?.upcomingTrains || [];
   const out = [];
@@ -402,7 +417,8 @@ function normalize(data) {
     if (!arr) continue;
     const idx = CONFIG.TILES.findIndex(tile => dir.includes(tile.dir) && tile.match.test(sign));
     if (idx === -1) continue;
-    const viaHoboken = /via\s+hoboken/i.test(sign);
+    const viaHoboken = /via\s+hoboken/i.test(sign)
+      || (CONFIG.TILES[idx].label === "33 St" && isCollapsedSchedule());
     out.push({ destIdx:idx, arrival:arr, viaHoboken });
 
     // Overnight/weekend: a "33rd St via Hoboken" train stops at Hoboken
