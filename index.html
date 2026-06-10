@@ -370,7 +370,7 @@ CONFIG.TILES.forEach((t, i) => {
   el.style.setProperty("--rgb", t.rgb);
   el.innerHTML = `
     <div class="dest">${t.label}</div>
-    <div class="headsign">${t.sub}</div>
+    <div class="headsign">${t.sub}<span class="via" hidden> · via Hoboken</span></div>
     <div class="next"><span class="mins">—</span><span class="unit"></span></div>
     <div class="then"></div>`;
   board.insertBefore(el, timeTile);
@@ -402,7 +402,8 @@ function normalize(data) {
     if (!arr) continue;
     const idx = CONFIG.TILES.findIndex(tile => dir.includes(tile.dir) && tile.match.test(sign));
     if (idx === -1) continue;
-    out.push({ destIdx:idx, arrival:arr });
+    const viaHoboken = /via\s+hoboken/i.test(sign);
+    out.push({ destIdx:idx, arrival:arr, viaHoboken });
   }
   return out;
 }
@@ -522,16 +523,18 @@ function render() {
     const minsEl = el.querySelector(".mins");
     const unitEl = el.querySelector(".unit");
     const thenEl = el.querySelector(".then");
+    const viaEl = el.querySelector(".via");
 
     if (!mine.length) {
       el.classList.add("empty");
       minsEl.textContent = "—"; minsEl.className = "mins"; minsEl.dataset.val = "";
-      unitEl.textContent = ""; thenEl.innerHTML = "";
+      unitEl.textContent = ""; thenEl.innerHTML = ""; viaEl.hidden = true;
       return;
     }
     el.classList.remove("empty");
 
     const first = mine[0];
+    viaEl.hidden = !first.viaHoboken;
     let val, due = false;
     if (first.mins <= 0) {
       val = "Due"; due = true; unitEl.textContent = "";
