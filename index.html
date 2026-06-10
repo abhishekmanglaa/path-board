@@ -16,12 +16,12 @@
 <style>
 :root[data-theme="dark"] {
   --bg:#040810;
-  --tile-alpha:.17; --tile-border:.40;
+  --tile-alpha:.22; --tile-border:.50;
   --glass-hi:rgba(255,255,255,.17);
   --shadow:0 12px 48px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.3);
   --ink:#FFFFFF;
-  --sub:rgba(255,255,255,.58);
-  --ghost:rgba(255,255,255,.28);
+  --sub:rgba(255,255,255,.74);
+  --ghost:rgba(255,255,255,.45);
   --foot-bg:rgba(255,255,255,.04);
   --foot-edge:rgba(255,255,255,.07);
   --stale:#E8913C;
@@ -29,12 +29,12 @@
 }
 :root[data-theme="light"] {
   --bg:#F0F4FA;
-  --tile-alpha:.13; --tile-border:.32;
+  --tile-alpha:.17; --tile-border:.42;
   --glass-hi:rgba(255,255,255,.82);
   --shadow:0 6px 32px rgba(8,24,60,.13), 0 1px 4px rgba(8,24,60,.07);
   --ink:#0A1628;
-  --sub:rgba(10,22,40,.58);
-  --ghost:rgba(10,22,40,.28);
+  --sub:rgba(10,22,40,.74);
+  --ghost:rgba(10,22,40,.45);
   --foot-bg:rgba(255,255,255,.55);
   --foot-edge:rgba(10,22,40,.08);
   --stale:#C9700A;
@@ -129,7 +129,8 @@ body::before {
   font-family:"Barlow Condensed",sans-serif;
   font-weight:700; text-transform:uppercase;
   letter-spacing:.05em; line-height:.95;
-  font-size:clamp(42px,8.5vmin,104px);
+  font-size:clamp(38px,7.8vmin,104px);
+  white-space:nowrap;
   position:relative; z-index:1;
 }
 .headsign {
@@ -181,7 +182,7 @@ body::before {
   font-size:clamp(25px,4.2vmin,52px);
 }
 .then .miss { color:var(--ghost); text-decoration:line-through }
-.then .sched { opacity:.6; font-style:italic }
+.then .sched { opacity:.75; font-style:italic }
 .then .dot  { color:var(--ghost); margin:0 .4em }
 .empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
 
@@ -200,8 +201,9 @@ body::before {
 }
 .t-date {
   font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(26px,5.4vmin,64px); color:var(--sub);
+  font-size:clamp(24px,4.8vmin,56px); color:var(--sub);
   letter-spacing:.08em; text-transform:uppercase;
+  white-space:nowrap;
   position:relative; z-index:1; margin-top:.85em;
 }
 
@@ -367,7 +369,7 @@ const CONFIG = {
   WALK_MINUTES:    6,
   NIGHT_DIM_START: 23,
   NIGHT_DIM_END:   6,
-  NIGHT_DIM_OPACITY: 0.55,
+  NIGHT_DIM_OPACITY: 0.35,
 
   // PATH's consolidated overnight/weekend line runs roughly every 20 min;
   // used to project later departures the live feed doesn't report yet.
@@ -612,7 +614,7 @@ function render() {
     minsEl.className = "mins" + (due ? " due pulse" : "") + (changed ? " flip" : "");
     minsEl.dataset.val = val;
     minsEl.textContent = val;
-    minsEl.style.opacity = (!due && first.mins < CONFIG.WALK_MINUTES) ? ".38" : "";
+    minsEl.style.opacity = (!due && first.mins < CONFIG.WALK_MINUTES) ? ".55" : "";
 
     const eta = first.arrival.toLocaleTimeString("en-US",
       { hour:"numeric", minute:"2-digit", hour12:true });
