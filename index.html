@@ -185,7 +185,7 @@ body::before {
 .empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
 
 /* ── TIME TILE ──────────────────────────────────────────────────── */
-#tile-time { --rgb:255,176,0; justify-content:center; align-items:center; text-align:center }
+#tile-time { --rgb:178,131,255; justify-content:center; align-items:center; text-align:center }
 .t-hm {
   font-family:"Barlow",sans-serif; font-weight:600;
   font-size:clamp(64px,13.5vmin,160px); line-height:.9;
@@ -352,10 +352,10 @@ const CONFIG = {
   WEATHER_MINUTES: 10,      // weather refresh cadence
 
   TILES: [
-    { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, fallbackRGB:"101,193,0" },
-    { label:"33 St",      sub:"33rd Street",        dir:"TO_NY", match:/33|thirty/i,       fallbackRGB:"255,153,0" },
-    { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        fallbackRGB:"101,193,0" },
-    { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         fallbackRGB:"255,153,0" },
+    { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, rgb:"101,193,0" },
+    { label:"33 St",      sub:"33rd Street",        dir:"TO_NY", match:/33|thirty/i,       rgb:"255,153,0" },
+    { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        rgb:"101,193,0" },
+    { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         rgb:"255,153,0" },
   ],
 };
 
@@ -367,7 +367,7 @@ const timeTile = document.getElementById("tile-time");
 CONFIG.TILES.forEach((t, i) => {
   const el = document.createElement("div");
   el.className = "tile"; el.id = "tile" + i;
-  el.style.setProperty("--rgb", t.fallbackRGB);
+  el.style.setProperty("--rgb", t.rgb);
   el.innerHTML = `
     <div class="dest">${t.label}</div>
     <div class="headsign">${t.sub}</div>
@@ -375,12 +375,6 @@ CONFIG.TILES.forEach((t, i) => {
     <div class="then"></div>`;
   board.insertBefore(el, timeTile);
 });
-
-function hexToRGB(hex) {
-  const h = hex.replace(/^#/, "");
-  if (!/^[0-9a-f]{6}$/i.test(h)) return null;
-  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)].join(",");
-}
 
 /* ── FETCH TRAINS ───────────────────────────────────────────────── */
 async function load() {
@@ -406,12 +400,9 @@ function normalize(data) {
     const sign = t.headsign || t.headSign || t.lineName || t.routeDisplayName || "";
     const arr  = parseArrival(t);
     if (!arr) continue;
-    const color = (Array.isArray(t.lineColors) && t.lineColors[0])
-                ? t.lineColors[0]
-                : (t.lineColor ? "#" + String(t.lineColor).replace(/^#/,"") : null);
     const idx = CONFIG.TILES.findIndex(tile => dir.includes(tile.dir) && tile.match.test(sign));
     if (idx === -1) continue;
-    out.push({ destIdx:idx, arrival:arr, color });
+    out.push({ destIdx:idx, arrival:arr });
   }
   return out;
 }
@@ -540,11 +531,6 @@ function render() {
     }
     el.classList.remove("empty");
 
-    if (mine[0].color) {
-      const rgb = hexToRGB(mine[0].color);
-      if (rgb) el.style.setProperty("--rgb", rgb);
-    }
-
     const first = mine[0];
     let val, due = false;
     if (first.mins <= 0) {
@@ -600,10 +586,10 @@ document.addEventListener("visibilitychange", () => {
 function demo() {
   const m = n => new Date(Date.now()+n*60000);
   return [
-    {destIdx:0,arrival:m(4), color:"#65C100"},{destIdx:0,arrival:m(11),color:"#65C100"},{destIdx:0,arrival:m(19),color:"#65C100"},
-    {destIdx:1,arrival:m(2), color:"#FF9900"},{destIdx:1,arrival:m(9), color:"#FF9900"},{destIdx:1,arrival:m(17),color:"#FF9900"},
-    {destIdx:2,arrival:m(0), color:"#65C100"},{destIdx:2,arrival:m(14),color:"#65C100"},{destIdx:2,arrival:m(24),color:"#65C100"},
-    {destIdx:3,arrival:m(7), color:"#FF9900"},{destIdx:3,arrival:m(18),color:"#FF9900"},
+    {destIdx:0,arrival:m(4)}, {destIdx:0,arrival:m(11)},{destIdx:0,arrival:m(19)},
+    {destIdx:1,arrival:m(2)}, {destIdx:1,arrival:m(9)}, {destIdx:1,arrival:m(17)},
+    {destIdx:2,arrival:m(0)}, {destIdx:2,arrival:m(14)},{destIdx:2,arrival:m(24)},
+    {destIdx:3,arrival:m(7)}, {destIdx:3,arrival:m(18)},
   ];
 }
 
