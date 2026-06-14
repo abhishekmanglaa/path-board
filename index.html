@@ -117,6 +117,22 @@ body::before {
 .tile:nth-child(3)::after, .tile:nth-child(4)::after {
   right:auto; left:-12%; bottom:auto; top:-22%;
 }
+/* slow ambient drift of the corner glow — barely-there life */
+.tile::after { animation:glowDrift 16s ease-in-out infinite alternate; }
+@keyframes glowDrift {
+  from { transform:translate(0,0) scale(1) }
+  to   { transform:translate(-7%,-6%) scale(1.14) }
+}
+/* staggered rise-in on first paint */
+.tile { animation:riseIn .7s cubic-bezier(.2,.7,.2,1) both; }
+.board > .tile:nth-child(1) { animation-delay:.04s }
+.board > .tile:nth-child(2) { animation-delay:.12s }
+.board > .tile:nth-child(3) { animation-delay:.20s }
+.board > .tile:nth-child(4) { animation-delay:.28s }
+@keyframes riseIn {
+  from { opacity:0; transform:translateY(20px) scale(.984) }
+  to   { opacity:1; transform:none }
+}
 
 /* ── TRAIN TILE CONTENT — everything bigger ─────────────────────── */
 .dest {
@@ -125,7 +141,13 @@ body::before {
   letter-spacing:.05em; line-height:.95;
   font-size:clamp(38px,7.8vmin,104px);
   white-space:nowrap;
+  display:flex; align-items:center; gap:.34em;
   position:relative; z-index:1;
+}
+.bullet {
+  width:.4em; height:.4em; border-radius:50%; flex-shrink:0;
+  background:rgb(var(--rgb));
+  box-shadow:0 0 .55em rgba(var(--rgb),.85), 0 0 .12em rgba(var(--rgb),.9);
 }
 .headsign {
   margin-top:.3em; color:var(--sub);
@@ -133,13 +155,13 @@ body::before {
   letter-spacing:.04em; position:relative; z-index:1;
 }
 .next {
-  flex:1; display:flex; align-items:center;
+  flex:1; display:flex; align-items:center; justify-content:center;
   gap:.12em; min-height:0; position:relative; z-index:1;
   perspective:600px;
 }
 .mins {
-  font-weight:700; line-height:.76; letter-spacing:-.03em;
-  font-size:clamp(88px,24vmin,270px);
+  font-weight:700; line-height:.74; letter-spacing:-.03em;
+  font-size:clamp(96px,26vmin,300px);
   display:inline-block; transform-style:preserve-3d; backface-visibility:hidden;
 }
 .mins.flip { animation:flipDigit .6s ease; }
@@ -167,7 +189,7 @@ body::before {
 .then {
   color:var(--sub); font-weight:400;
   font-size:clamp(21px,3.6vmin,44px);
-  letter-spacing:.02em; min-height:1.2em;
+  letter-spacing:.02em; min-height:1.2em; text-align:center;
   position:relative; z-index:1;
   padding-top:clamp(4px,.6vmin,8px);
 }
@@ -179,6 +201,7 @@ body::before {
 .then .sched { opacity:.75; font-style:italic }
 .then .dot  { color:var(--ghost); margin:0 .4em }
 .empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
+.empty .then .eta { color:var(--sub); font-weight:600; opacity:.78 }
 
 /* ── TIME TILE ──────────────────────────────────────────────────── */
 #tile-time { --rgb:178,131,255; justify-content:center; align-items:center; text-align:center }
@@ -217,16 +240,16 @@ body::before {
 /* ── WEATHER TILE ───────────────────────────────────────────────── */
 #tile-weather { --rgb:55,138,221; justify-content:center; align-items:center; text-align:center }
 .w-uv {
-  position:absolute; top:clamp(14px,2vmin,28px); left:50%; transform:translateX(-50%);
+  position:absolute; top:clamp(14px,2.2vmin,26px); right:clamp(14px,2.2vmin,26px);
   z-index:2; font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(12px,1.9vmin,21px); letter-spacing:.07em; text-transform:uppercase;
-  padding:.3em .85em; border-radius:999px; white-space:nowrap;
+  font-size:clamp(11px,1.7vmin,19px); letter-spacing:.07em; text-transform:uppercase;
+  padding:.3em .8em; border-radius:999px; white-space:nowrap;
   border:1px solid currentColor;
 }
 .w-uv[hidden] { display:none }
 .w-icon {
-  width:clamp(40px,7.5vmin,84px); height:clamp(40px,7.5vmin,84px);
-  margin:0 auto .15em; color:var(--ink); opacity:.9;
+  width:clamp(54px,9.5vmin,112px); height:clamp(54px,9.5vmin,112px);
+  margin:0 auto .1em; color:var(--ink); opacity:.92;
   position:relative; z-index:1;
 }
 .w-icon svg { width:100%; height:100%; display:block }
@@ -322,7 +345,7 @@ body::before {
 @media (prefers-reduced-motion:reduce) {
   .pulse { animation:none }
   .mins.flip { animation:none }
-  .tile:has(.due) { animation:none }
+  .tile, .tile::after, .tile:has(.due) { animation:none }
   #night { transition:none }
 }
 </style>
@@ -446,6 +469,25 @@ function scheduledDepartures(schedKey, now, after, limit) {
   return out;
 }
 
+// Next scheduled departure for an empty tile, looking up to a few days ahead
+// (e.g. weekend WTC → next service is Monday morning). Returns "" if none.
+function nextServiceLabel(schedKey, d) {
+  if (!schedKey) return "";
+  for (let off = 0; off < 4; off++) {
+    const day = new Date(d); day.setDate(day.getDate() + off);
+    const afterMin = off === 0 ? (d - startOfDay(d)) / 60000 : -1;
+    for (const m of (SCHED[dayType(day)][schedKey] || [])) {
+      if (m > afterMin) {
+        const arr = minutesToDate(day, m);
+        const t = arr.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
+        return off === 0 ? `Next ~${t}`
+          : `Next ~${t} ${arr.toLocaleDateString("en-US",{weekday:"short"})}`;
+      }
+    }
+  }
+  return "";
+}
+
 // Typical current headway (minutes) — median gap of the next several JSQ-33
 // departures. Drives the service-state line in the time tile.
 function serviceHeadwayMin(d) {
@@ -468,7 +510,7 @@ CONFIG.TILES.forEach((t, i) => {
   el.className = "tile"; el.id = "tile" + i;
   el.style.setProperty("--rgb", t.rgb);
   el.innerHTML = `
-    <div class="dest">${t.label}</div>
+    <div class="dest"><span class="bullet"></span>${t.label}</div>
     <div class="headsign">${t.sub}<span class="via" hidden> · via Hoboken</span></div>
     <div class="next"><span class="mins">—</span><span class="unit"></span></div>
     <div class="then"></div>`;
@@ -739,7 +781,9 @@ function render() {
     if (!blended.length) {
       el.classList.add("empty");
       minsEl.textContent = "—"; minsEl.className = "mins"; minsEl.dataset.val = "";
-      unitEl.textContent = ""; thenEl.innerHTML = ""; viaEl.hidden = true;
+      unitEl.textContent = ""; viaEl.hidden = true;
+      const hint = nextServiceLabel(tile.sched, d);
+      thenEl.innerHTML = hint ? `<span class="eta">${hint}</span>` : "";
       return;
     }
     el.classList.remove("empty");
