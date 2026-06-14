@@ -1,2 +1,6 @@
 .claude/
 .DS_Store
+
+# Local schedule deliverables / scrape artifacts — not part of the deployed app
+*.xlsx
+*.model.json
