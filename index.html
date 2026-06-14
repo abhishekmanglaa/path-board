@@ -209,6 +209,14 @@ body::before {
 
 /* ── WEATHER TILE ───────────────────────────────────────────────── */
 #tile-weather { --rgb:55,138,221; justify-content:center; align-items:center; text-align:center }
+.w-uv {
+  position:absolute; top:clamp(14px,2vmin,28px); left:50%; transform:translateX(-50%);
+  z-index:2; font-family:"Barlow",sans-serif; font-weight:700;
+  font-size:clamp(12px,1.9vmin,21px); letter-spacing:.07em; text-transform:uppercase;
+  padding:.3em .85em; border-radius:999px; white-space:nowrap;
+  border:1px solid currentColor;
+}
+.w-uv[hidden] { display:none }
 .w-icon {
   width:clamp(40px,7.5vmin,84px); height:clamp(40px,7.5vmin,84px);
   margin:0 auto .15em; color:var(--ink); opacity:.9;
@@ -322,6 +330,7 @@ body::before {
         <div class="t-date" id="t-date">—</div>
       </div>
       <div class="tile" id="tile-weather">
+        <div class="w-uv" id="w-uv" hidden></div>
         <div class="w-icon" id="w-icon"></div>
         <div class="w-temp" id="w-temp">--<sup>°</sup></div>
         <div class="w-cond" id="w-cond">—</div>
@@ -459,15 +468,13 @@ async function load() {
   }
 }
 
-// The JSQ–33 St line routes through Hoboken ("via Hoboken") whenever PATH is on
-// reduced service: ALL day on weekends, and weekday overnights (11PM-6AM, which
-// also covers Fri late-night and Mon early-morning). Used both to label tiles
-// and as a fallback when the live feed's headsign doesn't spell it out.
+// The JSQ–33 St line consolidates through Hoboken ("via Hoboken") only during
+// the overnight window (~11PM-6AM, any day) — NOT all weekend. The live feed's
+// headsign is authoritative; this time check is just a fallback for when the
+// feed is down, and for labelling scheduled (non-live) departures overnight.
 function isCollapsedSchedule(d = new Date()) {
-  const day  = d.getDay(); // 0=Sun .. 6=Sat
   const hour = d.getHours() + d.getMinutes() / 60;
-  if (day === 0 || day === 6) return true;     // all weekend
-  return hour >= 23 || hour < 6;               // weekday overnight
+  return hour >= 23 || hour < 6;
 }
 
 function normalize(data) {
@@ -547,6 +554,13 @@ function uvLevel(uv) {
   if (uv <= 10) return "Very High";
   return "Extreme";
 }
+function uvColor(uv) {
+  if (uv <= 2) return "120,200,80";    // green
+  if (uv <= 5) return "240,190,40";    // yellow
+  if (uv <= 7) return "245,140,40";    // orange
+  if (uv <= 10) return "240,80,80";    // red
+  return "180,110,230";                // purple
+}
 
 async function loadWeather() {
   try {
@@ -590,8 +604,18 @@ async function loadWeather() {
       const extra = [];
       if (rainTxt) extra.push(rainTxt);
       if (!isNaN(wind)) extra.push(`Wind ${wind} km/h`);
-      if (!isNaN(uv)) extra.push(`UV ${uv} ${uvLevel(uv)}`);
       document.getElementById("w-extra").textContent = extra.join("  ·  ");
+
+      const uvEl = document.getElementById("w-uv");
+      if (!isNaN(uv)) {
+        const c = uvColor(uv);
+        uvEl.textContent = `UV ${uv} · ${uvLevel(uv)}`;
+        uvEl.style.color = `rgb(${c})`;
+        uvEl.style.background = `rgba(${c},.15)`;
+        uvEl.hidden = false;
+      } else {
+        uvEl.hidden = true;
+      }
 
       // Late at night, also show tomorrow's forecast.
       const tomorrowEl = document.getElementById("w-tomorrow");
