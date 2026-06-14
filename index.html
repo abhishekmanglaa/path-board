@@ -382,7 +382,8 @@ const CONFIG = {
 
   DEPARTURES_SHOWN: 3,
   MAX_LOOKAHEAD_MINUTES: 120, // hide scheduled departures further out than this
-                             // (e.g. weekends have no Newport→WTC service)
+  FALLBACK_HEADWAY_MINUTES: 15, // even-headway estimate when the timetable has
+                                // no times but live service is running
 
   // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
   LAT: 40.7270, LON: -74.0335,
@@ -679,6 +680,21 @@ function render() {
           viaHoboken: (tile.sched === "33" || tile.sched === "JSQ") && collapsed,
           scheduled:true
         });
+      }
+    }
+
+    // Last resort: if the live feed proves service is running but the embedded
+    // timetable had no times to pad with (e.g. weekend Newport→WTC, which the
+    // scraped trackwork weekend omitted), project an even headway so the tile
+    // still shows DEPARTURES_SHOWN. Gated on live service so we never invent
+    // trains during a genuine no-service gap.
+    if (blended.length && !blended[0].scheduled) {
+      while (blended.length < CONFIG.DEPARTURES_SHOWN) {
+        const last = blended[blended.length-1];
+        const arrival = new Date(last.arrival.getTime() + CONFIG.FALLBACK_HEADWAY_MINUTES * 60000);
+        if ((arrival - now) > CONFIG.MAX_LOOKAHEAD_MINUTES * 60000) break;
+        blended.push({ arrival, mins:Math.round((arrival - now)/60000),
+          viaHoboken:false, scheduled:true });
       }
     }
 
