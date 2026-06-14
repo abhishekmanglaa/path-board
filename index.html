@@ -68,27 +68,21 @@ body::before {
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-/* ── GRID: 4 train tiles (2×2) + right rail (time / weather) ───── */
+/* ── GRID: 2×2 diagonal — WTC + 33 St on one diagonal, ─────────────
+   Time + Weather on the other. (Hoboken / Journal Sq hidden for now.) */
 .board {
   flex:1; min-height:0;
   display:grid;
-  grid-template-columns:1.15fr 1.15fr .85fr;
+  grid-template-columns:1fr 1fr;
   grid-template-rows:1fr 1fr;
   gap:clamp(10px,1.5vmin,18px);
   padding:clamp(10px,1.5vmin,18px);
   padding-bottom:0;
 }
-#tile-time    { grid-column:3; grid-row:1 }
-#tile-weather { grid-column:3; grid-row:2 }
-
-@media (orientation:portrait) {
-  .board {
-    grid-template-columns:1fr 1fr;
-    grid-template-rows:1fr 1fr .62fr;
-  }
-  #tile-time    { grid-column:1; grid-row:3 }
-  #tile-weather { grid-column:2; grid-row:3 }
-}
+#tile0        { grid-column:1; grid-row:1 } /* WTC     (top-left)     */
+#tile-time    { grid-column:2; grid-row:1 } /* Time    (top-right)    */
+#tile-weather { grid-column:1; grid-row:2 } /* Weather (bottom-left)  */
+#tile1        { grid-column:2; grid-row:2 } /* 33 St   (bottom-right) */
 
 /* ── GLASS TILE ─────────────────────────────────────────────────── */
 .tile {
@@ -205,6 +199,19 @@ body::before {
   letter-spacing:.08em; text-transform:uppercase;
   white-space:nowrap;
   position:relative; z-index:1; margin-top:.85em;
+}
+.t-status {
+  position:relative; z-index:1; margin-top:1.1em;
+  font-family:"Barlow",sans-serif; font-weight:700;
+  font-size:clamp(13px,2vmin,22px); letter-spacing:.06em; text-transform:uppercase;
+  padding:.4em 1em; border-radius:999px; max-width:92%;
+  color:rgb(120,200,80); background:rgba(120,200,80,.14);
+  border:1px solid rgba(120,200,80,.5);
+}
+.t-status[hidden] { display:none }
+.t-status.collapsed {
+  color:rgb(255,184,40); background:rgba(255,184,40,.14);
+  border-color:rgba(255,184,40,.5);
 }
 
 /* ── WEATHER TILE ───────────────────────────────────────────────── */
@@ -328,6 +335,7 @@ body::before {
         <div class="t-hm" id="t-hm">--:--</div>
         <div class="t-sec" id="t-sec">--</div>
         <div class="t-date" id="t-date">—</div>
+        <div class="t-status" id="t-status" hidden></div>
       </div>
       <div class="tile" id="tile-weather">
         <div class="w-uv" id="w-uv" hidden></div>
@@ -393,8 +401,10 @@ const CONFIG = {
   TILES: [
     { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, rgb:"101,193,0",  sched:"WTC" },
     { label:"33 St",      sub:"33rd Street",        dir:"TO_NY", match:/33|thirty/i,       rgb:"255,199,44", sched:"33"  },
-    { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        rgb:"101,193,0",  sched:"HOB" },
-    { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         rgb:"255,199,44", sched:"JSQ" },
+    // Temporarily hidden — set hidden:false to bring these back (layout reverts
+    // to the 6-tile grid automatically once more than 2 train tiles are shown).
+    { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        rgb:"101,193,0",  sched:"HOB", hidden:true },
+    { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         rgb:"255,199,44", sched:"JSQ", hidden:true },
   ],
 };
 
@@ -436,12 +446,24 @@ function scheduledDepartures(schedKey, now, after, limit) {
   return out;
 }
 
+// Typical current headway (minutes) — median gap of the next several JSQ-33
+// departures. Drives the service-state line in the time tile.
+function serviceHeadwayMin(d) {
+  const ds = scheduledDepartures("33", d, d, 6);
+  if (ds.length < 2) return null;
+  const gaps = [];
+  for (let i = 1; i < ds.length; i++) gaps.push(Math.round((ds[i] - ds[i-1]) / 60000));
+  gaps.sort((a,b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)];
+}
+
 /* ── BUILD TRAIN TILES ──────────────────────────────────────────── */
 let trains = [], lastGood = 0, usingDemo = false;
 
 const board = document.getElementById("board");
 const timeTile = document.getElementById("tile-time");
 CONFIG.TILES.forEach((t, i) => {
+  if (t.hidden) return;
   const el = document.createElement("div");
   el.className = "tile"; el.id = "tile" + i;
   el.style.setProperty("--rgb", t.rgb);
@@ -651,8 +673,19 @@ function render() {
   document.getElementById("t-date").textContent =
     d.toLocaleDateString("en-US",{weekday:"short", month:"short", day:"numeric"});
 
+  // service-state line
+  const collapsed = isCollapsedSchedule(d);
+  const hw = serviceHeadwayMin(d);
+  const statusEl = document.getElementById("t-status");
+  let status = collapsed ? "Overnight · via Hoboken" : "Full service";
+  if (hw) status += ` · ~${hw} min`;
+  statusEl.textContent = status;
+  statusEl.classList.toggle("collapsed", collapsed);
+  statusEl.hidden = false;
+
   // train tiles
   CONFIG.TILES.forEach((tile, i) => {
+    if (tile.hidden) return;
     const el = document.getElementById("tile" + i);
 
     // Live, real-time arrivals from the PATH feed (most accurate).
