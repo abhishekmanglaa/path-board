@@ -17,7 +17,7 @@
 html,body{height:100%;overflow:hidden;background:#0a0b0c}
 body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 
-/* ── STAGE ───────────────────────────────────────────────────────── */
+/* ── STAGE ─────────────────────────────────────────────────────────── */
 #stage{
   position:absolute;left:50%;top:50%;
   width:1133px;height:744px;
@@ -28,163 +28,137 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
   overflow:hidden;
 }
 
-/* ── ANIMATIONS ──────────────────────────────────────────────────── */
-@keyframes flapIn    {from{transform:translateY(-6%);opacity:.4}to{transform:translateY(0);opacity:1}}
+/* ── ANIMATIONS ─────────────────────────────────────────────────────── */
+@keyframes flapIn     {from{transform:translateY(-6%);opacity:.4}to{transform:translateY(0);opacity:1}}
 @keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:.42}}
-@keyframes softGlow  {0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes softGlow   {0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes rainFall   {0%{transform:translateY(-3px);opacity:0}20%{opacity:1}100%{transform:translateY(13px);opacity:0}}
+@keyframes rainGlow   {0%,100%{box-shadow:0 0 0 0 rgba(74,163,255,.45);border-color:rgba(74,163,255,.55)}50%{box-shadow:0 0 0 13px rgba(74,163,255,0);border-color:rgba(74,163,255,.9)}}
 
-/* ── HEADER ──────────────────────────────────────────────────────── */
+/* ── HEADER ─────────────────────────────────────────────────────────── */
 .hdr{
   flex-shrink:0;
   display:flex;align-items:center;justify-content:space-between;
-  padding:13px 30px;border-bottom:1px solid #1c1e20;
+  padding:18px 34px;border-bottom:1px solid #1c1e20;
 }
-.hdr-brand{display:flex;align-items:baseline;gap:14px}
-.hdr-name{font-family:'Barlow Condensed';font-weight:700;font-size:24px;letter-spacing:.06em;color:#eceae6}
-.hdr-line{font-size:10px;letter-spacing:.32em;color:#5a5f62}
-.hdr-right{display:flex;align-items:center;gap:10px}
-.hdr-live{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.2em;color:#6b7072;white-space:nowrap}
-.led{width:7px;height:7px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
+.hdr-brand{display:flex;align-items:baseline;gap:16px}
+.hdr-name{font-family:'Barlow Condensed';font-weight:800;font-size:38px;letter-spacing:.05em;color:#eceae6}
+.hdr-line{font-size:14px;letter-spacing:.34em;color:#5a5f62}
+.hdr-right{display:flex;align-items:center;gap:14px}
+.hdr-live{display:flex;align-items:center;gap:8px;font-size:14px;letter-spacing:.2em;color:#7ed320;white-space:nowrap}
+.led{width:9px;height:9px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
 .is-stale .led{background:#E8913C;animation:none}
 #demoBadge{font-size:9px;letter-spacing:.14em;color:#f0b429;background:rgba(240,180,41,.13);padding:3px 8px;border-radius:4px}
 #demoBadge[hidden]{display:none}
 
-/* ── COLUMNS ─────────────────────────────────────────────────────── */
-.cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 0.95fr}
+/* ── COLUMNS ─────────────────────────────────────────────────────────── */
+.cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1.18fr}
 
-/* ── TRAIN TILE ──────────────────────────────────────────────────── */
-.col-tile{border-right:1px solid #1c1e20;padding:22px 26px;display:flex;flex-direction:column}
-#tile0{border-left:5px solid #65C100}
-#tile1{border-left:5px solid #FFC72C;background:#0d0e0a}
+/* ── TRAIN TILE ──────────────────────────────────────────────────────── */
+.col-tile{border-right:1px solid #1c1e20;padding:26px 30px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#tile0{border-left:6px solid #65C100}
+#tile1{border-left:6px solid #FFC72C;background:#0d0e0a}
 
-.t-head{display:flex;align-items:center;gap:11px}
+.t-head{display:flex;align-items:center;gap:13px}
 .t-arrow{flex-shrink:0}
-.t-dest{font-family:'Barlow Condensed';font-weight:700;font-size:38px;line-height:1}
+.t-dest{font-family:'Barlow Condensed';font-weight:700;font-size:60px;line-height:.9}
 #tile0 .t-dest{color:#7ed320}
 #tile1 .t-dest{color:#FFC72C}
-.t-sub{font-size:10px;letter-spacing:.24em;margin:5px 0 0 43px}
+.t-sub{font-size:14px;letter-spacing:.22em;margin:8px 0 0 55px}
 #tile0 .t-sub{color:#5a5f62}
 #tile1 .t-sub{color:#6b6a4a}
 
-.flap-wrap{flex:1;display:flex;align-items:center;gap:14px;min-height:0}
-.flap-box{
-  position:relative;width:178px;height:246px;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-#tile0 .flap-box{background:#141618;border:1px solid #26292d}
-#tile1 .flap-box{background:#1a1706;border:1px solid #4a3d0e}
-.flap-box.urgent{animation:urgentPulse 1.4s ease infinite}
+/* Big floating digit */
+.flap-wrap{flex:1;display:flex;align-items:center;gap:8px;min-height:0}
 .flap-num{
   font-family:'Barlow Condensed';font-weight:700;
-  font-size:210px;line-height:1;user-select:none;
+  font-size:340px;line-height:.72;user-select:none;
 }
 #tile0 .flap-num{color:#fff}
 #tile1 .flap-num{color:#FFC72C}
 .flap-num.flip{animation:flapIn .45s ease}
-.flap-line{position:absolute;left:0;right:0;top:50%;height:2px}
-#tile0 .flap-line{background:#0a0b0c}
-#tile1 .flap-line{background:#0d0e0a}
-.flap-aside{display:flex;flex-direction:column;gap:9px}
-.flap-unit{font-family:'Barlow Condensed';font-weight:500;font-size:22px}
+.flap-num.urgent{animation:urgentPulse 1.4s ease infinite}
+.flap-aside{display:flex;flex-direction:column;gap:12px;align-self:center;padding-bottom:20px}
+.flap-unit{font-family:'Barlow Condensed';font-weight:500;font-size:34px;letter-spacing:.03em;line-height:1}
 #tile0 .flap-unit{color:#9a9f9f}
 #tile1 .flap-unit{color:#b89a3a}
 
-.then-row{display:flex;align-items:center;gap:12px;padding-top:12px}
+.then-row{display:flex;align-items:center;gap:16px;padding-top:15px}
 #tile0 .then-row{border-top:1px solid #1c1e20}
 #tile1 .then-row{border-top:1px solid #2a2508}
-.tile-badge{font-size:9px;letter-spacing:.14em;padding:5px 10px;border-radius:100px;white-space:nowrap}
+.tile-badge{font-size:16px;letter-spacing:.1em;padding:8px 15px;border-radius:100px;white-space:nowrap}
 .badge-scheduled{color:#7ed320;background:rgba(101,193,0,.13)}
 .badge-boarding {color:#FFC72C;background:rgba(255,199,44,.13)}
 .badge-live     {color:#9a9f9f;background:rgba(154,159,159,.12)}
-.then-label{font-size:10px;letter-spacing:.14em;flex-shrink:0}
+.then-label{font-size:14px;letter-spacing:.14em;flex-shrink:0}
 #tile0 .then-label{color:#5a5f62}
 #tile1 .then-label{color:#6b6a4a}
-.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:26px}
+.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:52px;letter-spacing:.04em;line-height:1;white-space:nowrap}
 #tile0 .then-times{color:#c9ccc8}
 #tile1 .then-times{color:#d8c579}
 
-/* ── RIGHT RAIL ──────────────────────────────────────────────────── */
-.rail{display:flex;flex-direction:column;gap:10px;padding:14px;min-height:0;overflow:hidden}
+/* ── RIGHT RAIL ──────────────────────────────────────────────────────── */
+.rail{display:flex;flex-direction:column;min-height:0}
+.rail-lbl{font-size:13px;letter-spacing:.3em;color:#5a5f62;margin-bottom:6px;flex-shrink:0}
 
-/* Time block */
-.time-blk{background:#101113;border:1px solid #1c1e20;border-radius:18px;padding:14px 18px;flex-shrink:0}
-.clk-row{display:flex;align-items:baseline;justify-content:space-between}
-.clk-hm{font-family:'Barlow Condensed';font-weight:600;font-size:58px;line-height:.8;color:#eceae6}
-.clk-sec{font-size:14px;color:#7ed320;margin-left:2px}
-.clk-meta{text-align:right;font-size:10px;letter-spacing:.16em;color:#9a9f9f;line-height:1.6}
-.clk-ampm{color:#5a5f62;display:block}
+/* Time section */
+.time-sec{flex:1;border-bottom:1px solid #1c1e20;padding:24px 28px;display:flex;flex-direction:column;min-height:0}
+.clk-wrap{flex:1;display:flex;flex-direction:column;justify-content:center}
+.clk-row{display:flex;align-items:baseline;gap:8px}
+.clk-hm{font-family:'Barlow Condensed';font-weight:600;font-size:180px;line-height:.78;color:#eceae6}
+.clk-sec{font-family:'Barlow Condensed';font-weight:500;font-size:46px;color:#7ed320}
+.clk-date{font-size:20px;letter-spacing:.18em;color:#9a9f9f;margin-top:10px}
 
-.sun-arc{position:relative;height:62px;margin-top:8px}
-.arc-left{position:absolute;left:0;bottom:-2px;font-size:9px;color:#5a5f62}
-.arc-right{position:absolute;right:0;bottom:-2px;text-align:right;font-size:9px;color:#5a5f62}
-.arc-val{font-family:'Barlow Condensed';font-weight:600;font-size:14px;color:#cfd2d0}
-.arc-center{position:absolute;left:0;right:0;top:35px;text-align:center;font-size:9px;letter-spacing:.1em;color:#6b7072}
-
-.svc-pill{margin-top:10px;display:inline-flex;align-items:center;gap:8px;border:1px solid #2c4a12;padding:5px 10px;border-radius:100px}
-.svc-dot{width:6px;height:6px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
-.svc-txt{font-size:10px;letter-spacing:.12em;color:#7ed320}
+.svc-pill{display:flex;align-items:center;gap:8px;border:1px solid #2c4a12;padding:12px 16px;flex-shrink:0}
+.svc-dot{width:10px;height:10px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
+.svc-txt{font-size:16px;letter-spacing:.12em;color:#7ed320}
 .svc-pill.collapsed{border-color:#4a3a12}
 .svc-pill.collapsed .svc-dot{background:#E8913C;animation:none}
 .svc-pill.collapsed .svc-txt{color:#E8913C}
 
-/* Weather block */
-.wx-blk{
-  flex:1;min-height:0;
-  background:#101113;border:1px solid #1c1e20;border-radius:18px;
-  padding:14px 18px;position:relative;
-  display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;
+/* Weather section */
+.wx-sec{flex:1;padding:24px 28px;display:flex;flex-direction:column;min-height:0}
+.wx-inner{flex:1;display:flex;flex-direction:column;justify-content:center}
+.wx-main{display:flex;align-items:center;gap:16px}
+.wx-icon{width:74px;height:74px;flex-shrink:0}
+.wx-icon svg{width:100%;height:100%;display:block;stroke:#cfd2d0}
+.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:138px;line-height:.78;color:#eceae6}
+.wx-cond{font-size:21px;color:#cfd2d0;margin-top:8px}
+.wx-lo{color:#8a8f8f}
+
+.rain-box{
+  display:flex;align-items:center;gap:14px;margin-top:12px;
+  background:rgba(74,163,255,.13);
+  border:1px solid rgba(74,163,255,.55);
+  padding:10px 18px;border-radius:14px;
+  animation:rainGlow 2.2s ease infinite;
 }
-.wx-uv{position:absolute;top:14px;right:14px;font-size:9px;letter-spacing:.06em;border:1px solid;padding:4px 8px;border-radius:100px}
-.wx-uv[hidden]{display:none}
-.wx-main{display:flex;align-items:center;gap:12px}
-.wx-icon{width:46px;height:46px;flex-shrink:0}
-.wx-icon svg{width:100%;height:100%;display:block}
-.wx-temp-row{display:flex;align-items:baseline;gap:8px}
-.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:66px;line-height:.78;color:#eceae6}
-.wx-feels{font-size:11px;color:#8a8f8a}
-.wx-desc{font-size:12px;color:#cfd2d0;margin-top:8px;line-height:1.4}
-.wx-sub{font-size:10px;letter-spacing:.06em;color:#6b7072;margin-top:4px}
+.rain-box[hidden]{display:none;animation:none}
+.rain-anim{position:relative;display:inline-block;width:36px;height:36px;flex:none}
+.rain-anim svg{position:absolute;top:0;left:0}
+.rain-drop{position:absolute;left:10px;top:22px;width:2.4px;height:7px;background:#7ec2ff;border-radius:2px;animation:rainFall 1s linear infinite}
+.rain-drop:nth-child(2){left:18px;animation-delay:.34s}
+.rain-drop:nth-child(3){left:26px;animation-delay:.68s}
+.rain-pct{font-family:'Barlow Condensed';font-weight:700;font-size:56px;line-height:.85;color:#7ec2ff}
+.rain-lbl{font-size:16px;letter-spacing:.16em;color:#5f9fd6;line-height:1.3;margin-left:auto;white-space:pre-line}
 
-.wx-hourly{border-top:1px solid #1c1e20;padding-top:10px}
-.wx-hourly-lbl{font-size:9px;letter-spacing:.2em;color:#5a5f62;margin-bottom:9px}
-.hourly-strip{position:relative}
-.hourly-line{position:absolute;left:12px;right:12px;top:27px;height:2px;background:linear-gradient(90deg,#4a3d0e,#7a6420,#4a3d0e);z-index:0}
-.hourly-cells{position:relative;z-index:1;display:flex;justify-content:space-between}
-.hourly-cell{display:flex;flex-direction:column;align-items:center;gap:6px}
-.hourly-hr{font-size:9px;color:#6b7072}
-.hourly-icon{background:#101113;padding:0 2px;display:flex;width:16px;height:16px}
-.hourly-icon svg{width:100%;height:100%}
-.hourly-temp{font-family:'Barlow Condensed';font-weight:600;font-size:15px;color:#dcdedb}
+.wx-tomorrow{border-top:1px solid #1c1e20;padding-top:11px;font-size:16px;letter-spacing:.1em;color:#565b5d;flex-shrink:0}
 
-.wx-forecast{border-top:1px solid #1c1e20;padding-top:10px}
-.wx-forecast-lbl{font-size:9px;letter-spacing:.2em;color:#5a5f62;margin-bottom:9px}
-.fc-rows{display:flex;flex-direction:column;gap:8px}
-.fc-row{display:flex;align-items:center;gap:10px}
-.fc-day{width:42px;font-size:10px;letter-spacing:.04em}
-.fc-icon{display:flex;width:15px;height:15px;flex-shrink:0}
-.fc-icon svg{width:100%;height:100%}
-.fc-lo{width:26px;text-align:right;font-family:'Barlow Condensed';font-weight:600;font-size:15px;color:#8a8f8a}
-.fc-bar{flex:1;height:5px;border-radius:4px;background:linear-gradient(90deg,#3a7d4f,#c9a13a,#FFC72C)}
-.fc-hi{width:26px;font-family:'Barlow Condensed';font-weight:700;font-size:17px;color:#eceae6}
-
-/* ── BIKE FOOTER ─────────────────────────────────────────────────── */
-#bike-bar{
+/* ── STAT BAR ────────────────────────────────────────────────────────── */
+#stat-bar{
   flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  gap:20px;padding:6px 30px;
-  border-top:1px solid #1c1e20;
-  font-size:10px;letter-spacing:.14em;color:#6b7072;
+  display:flex;align-items:center;gap:24px;
+  padding:12px 34px;border-top:1px solid #1c1e20;
+  font-size:13px;letter-spacing:.1em;color:#6b7072;
 }
-.bike-seg{display:flex;align-items:center;gap:5px}
-.bike-icon{width:13px;height:13px;flex-shrink:0;color:#5a5f62}
-.bike-icon svg{width:100%;height:100%;display:block}
-.bike-label{color:#5a5f62}
+.stat-chip{display:flex;align-items:center;gap:6px}
+.stat-icon{width:14px;height:14px;flex-shrink:0;color:#5a5f62}
+.stat-icon svg{width:100%;height:100%;display:block}
 .bike-count{color:#cfd2d0;font-weight:600}
 .bike-count.zero{color:#E8913C}
-.bike-unit{color:#5a5f62}
-.bike-divider{color:#3a3d40;font-weight:300}
+#stat-attribution{margin-left:auto;color:#4c5052;letter-spacing:.08em}
 
-/* ── OVERLAYS ────────────────────────────────────────────────────── */
+/* ── OVERLAYS ────────────────────────────────────────────────────────── */
 #night{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 2s ease;z-index:50}
 #grain{
   position:fixed;inset:0;pointer-events:none;z-index:40;
@@ -193,7 +167,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
   background-size:180px 180px;
 }
 @media(prefers-reduced-motion:reduce){
-  .flap-num.flip,.flap-box.urgent,#night{animation:none;transition:none}
+  .flap-num.flip,.flap-num.urgent,#night,.rain-box{animation:none;transition:none}
 }
 </style>
 </head>
@@ -218,18 +192,15 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
     <!-- WTC -->
     <div class="col-tile" id="tile0">
       <div class="t-head">
-        <svg class="t-arrow" width="32" height="24" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#65C100"/></svg>
-        <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#65C100"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0a0b0c" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="t-arrow" width="42" height="32" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#65C100"/></svg>
+        <svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#65C100"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0a0b0c" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="t-dest">WTC</span>
       </div>
       <div class="t-sub">WORLD TRADE CENTER</div>
       <div class="flap-wrap">
-        <div class="flap-box">
-          <span class="flap-num" id="fn-0">—</span>
-          <span class="flap-line"></span>
-        </div>
+        <span class="flap-num" id="fn-0">—</span>
         <div class="flap-aside">
-          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#65C100" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#65C100" stroke="none"/></svg>
+          <svg width="34" height="34" viewBox="0 0 26 26" fill="none" stroke="#65C100" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#65C100" stroke="none"/></svg>
           <span class="flap-unit">minutes</span>
         </div>
       </div>
@@ -243,18 +214,15 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
     <!-- 33 ST -->
     <div class="col-tile" id="tile1">
       <div class="t-head">
-        <svg class="t-arrow" width="32" height="24" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#FFC72C"/></svg>
-        <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FFC72C"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0d0e0a" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="t-arrow" width="42" height="32" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#FFC72C"/></svg>
+        <svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FFC72C"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0d0e0a" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="t-dest">33 ST</span>
       </div>
       <div class="t-sub" id="sub-1">33RD STREET</div>
       <div class="flap-wrap">
-        <div class="flap-box" id="flap-box-1">
-          <span class="flap-num" id="fn-1">—</span>
-          <span class="flap-line"></span>
-        </div>
+        <span class="flap-num" id="fn-1">—</span>
         <div class="flap-aside">
-          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#FFC72C" stroke="none"/></svg>
+          <svg width="34" height="34" viewBox="0 0 26 26" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#FFC72C" stroke="none"/></svg>
           <span class="flap-unit">minutes</span>
         </div>
       </div>
@@ -268,20 +236,13 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
     <!-- RIGHT RAIL -->
     <div class="rail">
       <!-- Time -->
-      <div class="time-blk">
-        <div class="clk-row">
-          <div><span class="clk-hm" id="clk-hm">—:——</span><span class="clk-sec" id="clk-sec">:00</span></div>
-          <div class="clk-meta"><span id="clk-date">— · — —</span><span class="clk-ampm" id="clk-ampm">—</span></div>
-        </div>
-        <div class="sun-arc">
-          <svg viewBox="0 0 300 82" width="100%" height="60" preserveAspectRatio="none" style="overflow:visible">
-            <path d="M8 74 Q150 -6 292 74" fill="none" stroke="#3a3d22" stroke-width="2"/>
-            <path id="sun-progress" d="M8 74 Q150 -6 292 74" fill="none" stroke="#f0b429" stroke-width="2.5" stroke-dasharray="0 400"/>
-            <circle id="sun-dot" cx="8" cy="74" r="6" fill="#f0b429" style="display:none"/>
-          </svg>
-          <div class="arc-left"><span class="arc-val" id="arc-rise">—</span></div>
-          <div class="arc-right"><span class="arc-val" id="arc-set">—</span></div>
-          <div class="arc-center" id="arc-daylight">— DAYLIGHT</div>
+      <div class="time-sec">
+        <div class="rail-lbl">TIME</div>
+        <div class="clk-wrap">
+          <div class="clk-row">
+            <span class="clk-hm" id="clk-hm">—:——</span><span class="clk-sec" id="clk-sec">00</span>
+          </div>
+          <div class="clk-date" id="clk-date">— · — — · —</div>
         </div>
         <div class="svc-pill" id="svc-pill">
           <span class="svc-dot"></span>
@@ -289,38 +250,32 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
         </div>
       </div>
       <!-- Weather -->
-      <div class="wx-blk">
-        <span class="wx-uv" id="wx-uv" hidden></span>
-        <div>
+      <div class="wx-sec">
+        <div class="rail-lbl">WEATHER</div>
+        <div class="wx-inner">
           <div class="wx-main">
             <div class="wx-icon" id="wx-icon"></div>
-            <div>
-              <div class="wx-temp-row">
-                <span class="wx-temp" id="wx-temp">—°</span>
-                <span class="wx-feels" id="wx-feels"></span>
-              </div>
-            </div>
+            <span class="wx-temp" id="wx-temp">—°</span>
           </div>
-          <div class="wx-desc" id="wx-desc">Loading…</div>
-          <div class="wx-sub"  id="wx-sub"></div>
-        </div>
-        <div class="wx-hourly">
-          <div class="wx-hourly-lbl">HOURLY</div>
-          <div class="hourly-strip">
-            <div class="hourly-line"></div>
-            <div class="hourly-cells" id="hourly-cells"></div>
+          <div class="wx-cond" id="wx-cond">Loading…</div>
+          <div class="rain-box" id="rain-box" hidden>
+            <span class="rain-anim">
+              <svg width="36" height="24" viewBox="0 0 34 22" fill="none" stroke="#7ec2ff" stroke-width="1.9"><path d="M9 18a6 6 0 0 1 .6-12 7.2 7.2 0 0 1 13.4 2.6 4.6 4.6 0 0 1 .2 9.4z"/></svg>
+              <span class="rain-drop"></span>
+              <span class="rain-drop"></span>
+              <span class="rain-drop"></span>
+            </span>
+            <span class="rain-pct" id="rain-pct">—%</span>
+            <span class="rain-lbl">RAIN&#10;LIKELY</span>
           </div>
         </div>
-        <div class="wx-forecast">
-          <div class="wx-forecast-lbl">NEXT DAYS</div>
-          <div class="fc-rows" id="forecast-rows"></div>
-        </div>
+        <div class="wx-tomorrow" id="wx-tomorrow"></div>
       </div>
     </div>
   </div>
 
-  <!-- BIKE BAR -->
-  <div id="bike-bar"></div>
+  <!-- STAT BAR -->
+  <div id="stat-bar"></div>
 </div>
 <div id="night"></div>
 <div id="grain"></div>
@@ -436,18 +391,18 @@ function haversineKm(lat1,lon1,lat2,lon2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-/* ── BUILD BIKE BAR ──────────────────────────────────────────────── */
-const bikeBar=document.getElementById("bike-bar");
+/* ── BUILD STAT BAR ──────────────────────────────────────────────── */
+const statBar=document.getElementById("stat-bar");
 CONFIG.BIKE_ANCHORS.forEach((a,i)=>{
-  if(i>0) bikeBar.insertAdjacentHTML("beforeend",`<span class="bike-divider">·</span>`);
-  bikeBar.insertAdjacentHTML("beforeend",
-    `<span class="bike-seg">`+
-    `<span class="bike-icon">${a.role==="bikes"?ICON_BIKE:ICON_DOCK}</span>`+
-    `<span class="bike-label">${a.label}</span>`+
+  statBar.insertAdjacentHTML("beforeend",
+    `<span class="stat-chip">`+
+    `<span class="stat-icon">${a.role==="bikes"?ICON_BIKE:ICON_DOCK}</span>`+
+    `<span style="color:#5a5f62;letter-spacing:.08em">${a.label}</span>`+
     `<span class="bike-count" id="bk-${i}">—</span>`+
-    `<span class="bike-unit">${a.role==="bikes"?"bikes":"docks"}</span>`+
+    `<span style="color:#5a5f62">${a.role==="bikes"?"bikes":"docks"}</span>`+
     `</span>`);
 });
+statBar.insertAdjacentHTML("beforeend",`<span id="stat-attribution">PORT AUTHORITY NY NJ</span>`);
 
 /* ── FETCH TRAINS ────────────────────────────────────────────────── */
 let trains=[], lastGood=0, usingDemo=false;
@@ -566,90 +521,40 @@ async function loadWeather() {
     if (!res.ok) throw new Error("HTTP "+res.status);
     const w=await res.json();
     const temp=Math.round(w?.current?.temperature_2m);
-    const feels=Math.round(w?.current?.apparent_temperature);
     const code=w?.current?.weather_code;
-    const wind=Math.round(w?.current?.wind_speed_10m);
-    const uv=Math.round(w?.current?.uv_index);
     const g=id=>document.getElementById(id);
+    const daily=w?.daily;
 
     if (!isNaN(temp)) {
       g('wx-temp').textContent=temp+'°';
-      g('wx-feels').textContent=!isNaN(feels)&&feels!==temp?'Feels '+feels+'°':'';
-      g('wx-desc').textContent=WMO[code]||'—';
       g('wx-icon').innerHTML=WMO_ICON[code]||I_SUN;
 
-      // rain forecast
-      let rainTxt='';
-      const times=w?.hourly?.time, probs=w?.hourly?.precipitation_probability;
-      if (times&&probs) {
-        const now=new Date(); let best=-1,bestIdx=-1;
-        for (let i=0;i<times.length;i++) {
-          if (new Date(times[i])<now) continue;
-          if (probs[i]>best) { best=probs[i]; bestIdx=i; }
-        }
-        if (bestIdx>=0&&best>0) {
-          const hr=new Date(times[bestIdx]).toLocaleTimeString("en-US",{hour:"numeric",hour12:true,timeZone:"America/New_York"});
-          rainTxt=`RAIN ${best}% AT ${hr}`;
+      // Condition + today lo
+      const loToday=Math.round(daily?.temperature_2m_min?.[0]);
+      const condStr=(WMO[code]||'—')+(isNaN(loToday)?'':' · <span class="wx-lo">↓'+loToday+'°</span>');
+      g('wx-cond').innerHTML=condStr;
+
+      // Rain indicator — peak precip probability in next 12 hours
+      let rainPct=0;
+      const hTimes=w?.hourly?.time, hProbs=w?.hourly?.precipitation_probability;
+      if (hTimes&&hProbs) {
+        const now=new Date(), cutoff=new Date(now.getTime()+12*3600000);
+        for (let i=0;i<hTimes.length;i++) {
+          const t=new Date(hTimes[i]);
+          if (t>=now&&t<=cutoff&&hProbs[i]>rainPct) rainPct=hProbs[i];
         }
       }
-      const sub=[];
-      if (rainTxt) sub.push(rainTxt);
-      if (!isNaN(wind)) sub.push(`WIND ${wind} KM/H`);
-      g('wx-sub').textContent=sub.join(' · ');
+      const rainBox=g('rain-box');
+      if (rainPct>=20) { g('rain-pct').textContent=rainPct+'%'; rainBox.hidden=false; }
+      else rainBox.hidden=true;
 
-      // UV pill
-      const uvEl=g('wx-uv');
-      if (!isNaN(uv)) {
-        const c=uvColor(uv);
-        uvEl.textContent=`UV ${uv} ${uvLevel(uv).toUpperCase()}`;
-        uvEl.style.color=`rgb(${c})`;
-        uvEl.style.borderColor=`rgba(${c},.5)`;
-        uvEl.style.background=`rgba(${c},.12)`;
-        uvEl.hidden=false;
-      } else { uvEl.hidden=true; }
+      // Tomorrow one-liner
+      const tmrHi=Math.round(daily?.temperature_2m_max?.[1]);
+      const tmrLo=Math.round(daily?.temperature_2m_min?.[1]);
+      const tmrCode=daily?.weather_code?.[1];
+      const WX_EMOJI={0:'☀',1:'☀',2:'⛅',3:'☁',45:'🌫',48:'🌫',51:'🌦',53:'🌦',55:'🌧',61:'🌦',63:'🌧',65:'🌧',71:'🌨',73:'🌨',75:'🌨',80:'🌦',81:'🌧',82:'🌧',95:'⛈',96:'⛈',99:'⛈'};
+      if (!isNaN(tmrHi)) g('wx-tomorrow').textContent=`TMRW ${WX_EMOJI[tmrCode]||'☀'} ${tmrHi}° · ↓${tmrLo}°`;
     }
-
-    // Hourly strip (next 7 hours)
-    const hTimes=w?.hourly?.time, hTemps=w?.hourly?.temperature_2m, hCodes=w?.hourly?.weather_code;
-    if (hTimes&&hTemps&&hCodes) {
-      const now=new Date(), cells=[];
-      for (let i=0;i<hTimes.length&&cells.length<7;i++) {
-        const t=new Date(hTimes[i]); if (t<=now) continue;
-        const h=t.getHours(), ap=h>=12?'P':'A', h12=h%12||12;
-        cells.push({lbl:h12+ap, temp:Math.round(hTemps[i]), code:hCodes[i]});
-      }
-      g('hourly-cells').innerHTML=cells.map(c=>
-        `<div class="hourly-cell">`+
-        `<span class="hourly-hr">${c.lbl}</span>`+
-        `<span class="hourly-icon">${WMO_ICON[c.code]||I_SUN}</span>`+
-        `<span class="hourly-temp">${c.temp}°</span>`+
-        `</div>`
-      ).join('');
-    }
-
-    // Forecast (3 days)
-    const daily=w?.daily;
-    if (daily?.temperature_2m_max) {
-      const today=new Date();
-      const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-      const labels=['TODAY','TMRW',DAYS[(today.getDay()+2)%7]];
-      g('forecast-rows').innerHTML=labels.map((lbl,i)=>{
-        const hi=Math.round(daily.temperature_2m_max[i]);
-        const lo=Math.round(daily.temperature_2m_min[i]);
-        const fc=daily.weather_code[i];
-        const color=i===0?'#cfd2d0':'#9a9f9f';
-        return `<div class="fc-row">`+
-          `<span class="fc-day" style="color:${color}">${lbl}</span>`+
-          `<span class="fc-icon">${WMO_ICON[fc]||I_SUN}</span>`+
-          `<span class="fc-lo">${lo}°</span>`+
-          `<div class="fc-bar"></div>`+
-          `<span class="fc-hi">${hi}°</span>`+
-          `</div>`;
-      }).join('');
-    }
-
-    // Sun arc
-    if (daily?.sunrise?.[0]) updateSunArc(daily.sunrise[0], daily.sunset[0]);
 
   } catch(e) { console.warn("weather failed:",e.message); }
 }
@@ -696,9 +601,8 @@ function render() {
   const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
   const MONS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   g('clk-hm').textContent=h+':'+mm;
-  g('clk-sec').textContent=':'+ss;
-  g('clk-date').textContent=DAYS[d.getDay()]+' · '+MONS[d.getMonth()]+' '+d.getDate();
-  g('clk-ampm').textContent=ap;
+  g('clk-sec').textContent=ss;
+  g('clk-date').textContent=DAYS[d.getDay()]+' · '+MONS[d.getMonth()]+' '+d.getDate()+' · '+ap;
 
   // Service status
   const collapsed=isCollapsedSchedule(d);
@@ -745,7 +649,6 @@ function render() {
     }
 
     const flapNumEl=g('fn-'+i);
-    const flapBoxEl=tileEl.querySelector('.flap-box');
     const badgeEl=g('badge-'+i);
     const thenEl=g('then-'+i);
 
@@ -765,7 +668,7 @@ function render() {
         flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
         flapNumEl.classList.add('flip'); flapNumEl.dataset.val='—';
       }
-      flapNumEl.textContent='—'; flapBoxEl.classList.remove('urgent');
+      flapNumEl.textContent='—'; flapNumEl.classList.remove('urgent');
       badgeEl.className='tile-badge badge-scheduled'; badgeEl.textContent='NO SVC';
       thenEl.textContent=hint||'—';
       return;
@@ -778,7 +681,7 @@ function render() {
       flapNumEl.classList.add('flip'); flapNumEl.dataset.val=val;
     }
     flapNumEl.textContent=val;
-    flapBoxEl.classList.toggle('urgent',first.mins<=3&&first.mins>=0);
+    flapNumEl.classList.toggle('urgent',first.mins<=3&&first.mins>=0);
 
     if (first.mins<=3) {
       badgeEl.className='tile-badge badge-boarding'; badgeEl.textContent='BOARDING';
