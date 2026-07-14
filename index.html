@@ -329,6 +329,35 @@ body::before {
 }
 #theme-toggle:hover { color:var(--ink) }
 
+/* ── BIKE BAR ───────────────────────────────────────────────────── */
+.bike-bar {
+  flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  gap:clamp(12px,2.2vmin,24px);
+  padding:clamp(7px,1.1vmin,12px) clamp(18px,2.8vmin,32px);
+  background:var(--foot-bg);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--foot-edge);
+}
+.bike-seg { display:flex; align-items:center; gap:.4em; }
+.bike-icon { width:1.1em; height:1.1em; flex-shrink:0; color:var(--ghost); }
+.bike-icon svg { width:100%; height:100%; display:block }
+.bike-label {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(11px,1.65vmin,16px); letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ghost);
+}
+.bike-count {
+  font-family:"Barlow",sans-serif; font-weight:700;
+  font-size:clamp(13px,1.9vmin,18px); color:var(--ink);
+}
+.bike-count.zero { color:var(--stale) }
+.bike-unit {
+  font-family:"Barlow",sans-serif; font-weight:400;
+  font-size:clamp(10px,1.45vmin,14px); color:var(--ghost);
+}
+.bike-divider { color:var(--ghost); opacity:.35; font-weight:300; user-select:none }
+
 #night {
   position:fixed; inset:0; background:#000;
   opacity:0; pointer-events:none;
@@ -374,6 +403,8 @@ body::before {
       </div>
     </div>
 
+    <div class="bike-bar" id="bike-bar"></div>
+
     <footer class="foot">
       <span class="status">
         <span class="led-dot"></span>
@@ -413,13 +444,20 @@ const CONFIG = {
 
   DEPARTURES_SHOWN: 3,
   MAX_LOOKAHEAD_MINUTES: 120, // hide scheduled departures further out than this
-  FALLBACK_HEADWAY_MINUTES: 15, // even-headway estimate when the timetable has
-                                // no times but live service is running
+  FALLBACK_HEADWAY_MINUTES: 20, // even-headway estimate when neither live nor
+                                // timetable can supply a headway (e.g. weekend WTC)
 
   // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
   LAT: 40.7270, LON: -74.0335,
   WEATHER_MINUTES: 10,      // weather refresh cadence
   WEATHER_TOMORROW_HOUR: 20, // show tomorrow's forecast from 8pm onward
+
+  BIKE_MINUTES: 5,
+  BIKE_ANCHORS: [
+    { label:"Newport",  role:"bikes", lat:40.7270, lon:-74.0335, radius:0.35 },
+    { label:"Hoboken",  role:"docks", lat:40.7358, lon:-74.0281, radius:0.45 },
+    { label:"Exch Pl",  role:"docks", lat:40.7167, lon:-74.0326, radius:0.40 },
+  ],
 
   TILES: [
     { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, rgb:"101,193,0",  sched:"WTC" },
@@ -488,16 +526,22 @@ function nextServiceLabel(schedKey, d) {
   return "";
 }
 
-// Typical current headway (minutes) — median gap of the next several JSQ-33
-// departures. Drives the service-state line in the time tile.
-function serviceHeadwayMin(d) {
-  const ds = scheduledDepartures("33", d, d, 6);
-  if (ds.length < 2) return null;
+// Current headway (minutes) for a line — median gap of its scheduled departures
+// over the next two hours TODAY (no spill to tomorrow, so it reflects the
+// service actually running now). null if fewer than two upcoming trains.
+function lineHeadwayMin(schedKey, d) {
+  if (!schedKey) return null;
+  const nowMin = (d - startOfDay(d)) / 60000;
+  const up = (SCHED[dayType(d)][schedKey] || []).filter(m => m > nowMin && m < nowMin + 120);
+  if (up.length < 2) return null;
   const gaps = [];
-  for (let i = 1; i < ds.length; i++) gaps.push(Math.round((ds[i] - ds[i-1]) / 60000));
+  for (let i = 1; i < up.length; i++) gaps.push(up[i] - up[i-1]);
   gaps.sort((a,b) => a - b);
   return gaps[Math.floor(gaps.length / 2)];
 }
+
+// Headway of the JSQ-33 line — drives the service-state line in the time tile.
+function serviceHeadwayMin(d) { return lineHeadwayMin("33", d); }
 
 /* ── BUILD TRAIN TILES ──────────────────────────────────────────── */
 let trains = [], lastGood = 0, usingDemo = false;
@@ -515,6 +559,30 @@ CONFIG.TILES.forEach((t, i) => {
     <div class="next"><span class="mins">—</span><span class="unit"></span></div>
     <div class="then"></div>`;
   board.insertBefore(el, timeTile);
+});
+
+/* ── BIKE ICONS + HELPERS ───────────────────────────────────────── */
+const ICON_BIKE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16" r="3.5"/><circle cx="19" cy="16" r="3.5"/><path d="M5 16l5-8h4"/><path d="M9 8l5 8"/><path d="M14 8h3l2 5"/></svg>`;
+const ICON_DOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V7h5a3 3 0 0 1 0 6H9"/></svg>`;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, dl = (lat2-lat1)*Math.PI/180, dL = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dl/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dL/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ── BUILD BIKE BAR ─────────────────────────────────────────────── */
+const bikeBar = document.getElementById("bike-bar");
+CONFIG.BIKE_ANCHORS.forEach((a, i) => {
+  if (i > 0) bikeBar.insertAdjacentHTML("beforeend",
+    `<span class="bike-divider">·</span>`);
+  bikeBar.insertAdjacentHTML("beforeend",
+    `<span class="bike-seg">` +
+    `<span class="bike-icon">${a.role === "bikes" ? ICON_BIKE : ICON_DOCK}</span>` +
+    `<span class="bike-label">${a.label}</span>` +
+    `<span class="bike-count" id="bk-${i}">—</span>` +
+    `<span class="bike-unit">${a.role === "bikes" ? "bikes" : "docks"}</span>` +
+    `</span>`);
 });
 
 /* ── FETCH TRAINS ───────────────────────────────────────────────── */
@@ -700,6 +768,38 @@ async function loadWeather() {
   } catch(e) { console.warn("weather failed:", e.message); }
 }
 
+/* ── BIKES (Citi Bike GBFS — no key, CORS-friendly) ─────────────── */
+async function loadBikes() {
+  try {
+    const [infoRes, stRes] = await Promise.all([
+      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_information.json", { cache:"no-store" }),
+      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_status.json",      { cache:"no-store" }),
+    ]);
+    if (!infoRes.ok || !stRes.ok) throw new Error("HTTP " + infoRes.status);
+    const [info, st] = await Promise.all([infoRes.json(), stRes.json()]);
+
+    const infoMap = {};
+    for (const s of (info.data?.stations || [])) infoMap[s.station_id] = s;
+    const stMap = {};
+    for (const s of (st.data?.stations || [])) stMap[s.station_id] = s;
+
+    CONFIG.BIKE_ANCHORS.forEach((a, i) => {
+      let total = 0;
+      for (const [id, s] of Object.entries(infoMap)) {
+        if (haversineKm(a.lat, a.lon, s.lat, s.lon) > a.radius) continue;
+        const status = stMap[id];
+        if (!status?.is_installed) continue;
+        if (a.role === "bikes" && status.is_renting)
+          total += (status.num_bikes_available ?? 0);
+        if (a.role === "docks" && status.is_returning)
+          total += (status.num_docks_available ?? 0);
+      }
+      const el = document.getElementById("bk-" + i);
+      if (el) { el.textContent = total; el.classList.toggle("zero", total === 0); }
+    });
+  } catch(e) { console.warn("bikes failed:", e.message); }
+}
+
 /* ── RENDER ─────────────────────────────────────────────────────── */
 function render() {
   const now = Date.now();
@@ -742,34 +842,40 @@ function render() {
     const blended = live.slice(0, CONFIG.DEPARTURES_SHOWN).map(t => ({
       arrival:t.arrival, mins:t.mins, viaHoboken:t.viaHoboken, scheduled:false
     }));
+    // Fill out to DEPARTURES_SHOWN. Live arrivals are real; anything after is
+    // projected by the *current headway* anchored on the last real departure.
+    // (Live feed and timetable don't share a clock grid, so using raw timetable
+    // times produces near-duplicate first gaps — e.g. live 8 min + scheduled
+    // 11 min for the same train. Spacing by headway keeps it regular: 8·18·28.)
     if (tile.sched && blended.length < CONFIG.DEPARTURES_SHOWN) {
       const collapsed = isCollapsedSchedule(d);
-      const after = blended.length ? blended[blended.length-1].arrival : d;
-      const sched = scheduledDepartures(tile.sched, d,
-        new Date(after.getTime() + 120000), CONFIG.DEPARTURES_SHOWN);
-      for (const arr of sched) {
-        if (blended.length >= CONFIG.DEPARTURES_SHOWN) break;
-        if ((arr - now) > CONFIG.MAX_LOOKAHEAD_MINUTES * 60000) break;
-        blended.push({
-          arrival:arr, mins:Math.round((arr - now)/60000),
-          viaHoboken: (tile.sched === "33" || tile.sched === "JSQ") && collapsed,
-          scheduled:true
-        });
-      }
-    }
+      const viaHob = (tile.sched === "33" || tile.sched === "JSQ") && collapsed;
 
-    // Last resort: if the live feed proves service is running but the embedded
-    // timetable had no times to pad with (e.g. weekend Newport→WTC, which the
-    // scraped trackwork weekend omitted), project an even headway so the tile
-    // still shows DEPARTURES_SHOWN. Gated on live service so we never invent
-    // trains during a genuine no-service gap.
-    if (blended.length && !blended[0].scheduled) {
-      while (blended.length < CONFIG.DEPARTURES_SHOWN) {
+      // No live train at all → seed with the next real scheduled time, but only
+      // if it's within the lookahead window (otherwise leave the tile empty so
+      // the empty state shows "Next ~…" instead of a far-off projection).
+      if (!blended.length) {
+        const seed = scheduledDepartures(tile.sched, d, d, 1)[0];
+        if (seed && (seed - now) <= CONFIG.MAX_LOOKAHEAD_MINUTES * 60000)
+          blended.push({ arrival:seed, mins:Math.round((seed - now)/60000),
+            viaHoboken:viaHob, scheduled:true });
+      }
+
+      // Headway: prefer the gap actually observed between two live trains; else
+      // the line's current scheduled headway; else a sane default.
+      let H = lineHeadwayMin(tile.sched, d);
+      if (live.length >= 2) {
+        const g = Math.round((live[live.length-1].arrival - live[live.length-2].arrival) / 60000);
+        if (g >= 3) H = g;
+      }
+      if (!H || H <= 0) H = CONFIG.FALLBACK_HEADWAY_MINUTES;
+
+      while (blended.length && blended.length < CONFIG.DEPARTURES_SHOWN) {
         const last = blended[blended.length-1];
-        const arrival = new Date(last.arrival.getTime() + CONFIG.FALLBACK_HEADWAY_MINUTES * 60000);
+        const arrival = new Date(last.arrival.getTime() + H * 60000);
         if ((arrival - now) > CONFIG.MAX_LOOKAHEAD_MINUTES * 60000) break;
         blended.push({ arrival, mins:Math.round((arrival - now)/60000),
-          viaHoboken:false, scheduled:true });
+          viaHoboken:viaHob, scheduled:true });
       }
     }
 
@@ -841,7 +947,7 @@ async function keepAwake() {
   try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {}
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") { keepAwake(); load(); loadWeather(); }
+  if (document.visibilityState === "visible") { keepAwake(); load(); loadWeather(); loadBikes(); }
 });
 
 /* ── DEMO ───────────────────────────────────────────────────────── */
@@ -863,10 +969,11 @@ ml.rel = "manifest";
 ml.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/json"}));
 document.head.appendChild(ml);
 
-keepAwake(); load(); loadWeather(); render();
+keepAwake(); load(); loadWeather(); loadBikes(); render();
 setInterval(render, 1000);
 setInterval(load, CONFIG.POLL_SECONDS * 1000);
 setInterval(loadWeather, CONFIG.WEATHER_MINUTES * 60 * 1000);
+setInterval(loadBikes,  CONFIG.BIKE_MINUTES  * 60 * 1000);
 </script>
 </body>
 </html>
