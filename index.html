@@ -1,439 +1,343 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <title>Newport PATH</title>
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Newport PATH" />
-<meta name="theme-color" content="#040810" id="tc" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
-
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Newport PATH"/>
+<meta name="theme-color" content="#0a0b0c" id="tc"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root[data-theme="dark"] {
-  --bg:#040810;
-  --tile-alpha:.22; --tile-border:.50;
-  --glass-hi:rgba(255,255,255,.17);
-  --shadow:0 12px 48px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.3);
-  --ink:#FFFFFF;
-  --sub:rgba(255,255,255,.74);
-  --ghost:rgba(255,255,255,.45);
-  --foot-bg:rgba(255,255,255,.04);
-  --foot-edge:rgba(255,255,255,.07);
-  --stale:#E8913C;
-  color-scheme:dark;
-}
-:root[data-theme="light"] {
-  --bg:#F0F4FA;
-  --tile-alpha:.17; --tile-border:.42;
-  --glass-hi:rgba(255,255,255,.82);
-  --shadow:0 6px 32px rgba(8,24,60,.13), 0 1px 4px rgba(8,24,60,.07);
-  --ink:#0A1628;
-  --sub:rgba(10,22,40,.74);
-  --ghost:rgba(10,22,40,.45);
-  --foot-bg:rgba(255,255,255,.55);
-  --foot-edge:rgba(10,22,40,.08);
-  --stale:#C9700A;
-  color-scheme:light;
-}
-:root { --amber:#FFB000; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0a0b0c}
+body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 
-*, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }
-html, body { height:100% }
-body {
-  background:var(--bg); background-attachment:fixed;
-  font-family:"Barlow Semi Condensed", system-ui, sans-serif;
-  -webkit-font-smoothing:antialiased;
+/* ── STAGE ───────────────────────────────────────────────────────── */
+#stage{
+  position:absolute;left:50%;top:50%;
+  width:1133px;height:744px;
+  transform-origin:center center;
+  transform:translate(-50%,-50%);
+  background:#0a0b0c;color:#eceae6;
+  display:flex;flex-direction:column;
   overflow:hidden;
-  font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
-}
-body::before {
-  content:""; position:fixed; inset:0; pointer-events:none;
-  background:
-    radial-gradient(40% 42% at 18% 26%, rgba(101,193,0,.11) 0%, transparent 68%),
-    radial-gradient(38% 40% at 56% 26%, rgba(255,153,0,.10) 0%, transparent 68%),
-    radial-gradient(38% 40% at 18% 74%, rgba(101,193,0,.09) 0%, transparent 68%),
-    radial-gradient(40% 42% at 56% 74%, rgba(255,153,0,.10) 0%, transparent 68%),
-    radial-gradient(34% 80% at 90% 50%, rgba(255,176,0,.07) 0%, transparent 70%);
-}
-:root[data-theme="light"] body::before { opacity:.55 }
-
-#app {
-  position:relative; z-index:1;
-  height:100%; display:flex; flex-direction:column;
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-/* ── GRID: 2×2 diagonal — WTC + 33 St on one diagonal, ─────────────
-   Time + Weather on the other. (Hoboken / Journal Sq hidden for now.) */
-.board {
-  flex:1; min-height:0;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:1fr 1fr;
-  gap:clamp(10px,1.5vmin,18px);
-  padding:clamp(10px,1.5vmin,18px);
-  padding-bottom:0;
-}
-#tile0        { grid-column:1; grid-row:1 } /* WTC     (top-left)     */
-#tile-time    { grid-column:2; grid-row:1 } /* Time    (top-right)    */
-#tile-weather { grid-column:1; grid-row:2 } /* Weather (bottom-left)  */
-#tile1        { grid-column:2; grid-row:2 } /* 33 St   (bottom-right) */
+/* ── ANIMATIONS ──────────────────────────────────────────────────── */
+@keyframes flapIn    {from{transform:translateY(-6%);opacity:.4}to{transform:translateY(0);opacity:1}}
+@keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:.42}}
+@keyframes softGlow  {0%,100%{opacity:.6}50%{opacity:1}}
 
-/* ── GLASS TILE ─────────────────────────────────────────────────── */
-.tile {
-  --rgb:120,120,120;
-  position:relative; overflow:hidden;
-  border-radius:clamp(20px,3.2vmin,30px);
-  padding:clamp(16px,2.4vmin,32px) clamp(18px,2.6vmin,34px);
-  display:flex; flex-direction:column;
-  background:linear-gradient(160deg,
-    rgba(var(--rgb), calc(var(--tile-alpha) + .08)) 0%,
-    rgba(var(--rgb), var(--tile-alpha))              50%,
-    rgba(var(--rgb), calc(var(--tile-alpha) - .04)) 100%);
-  backdrop-filter:blur(28px) saturate(200%);
-  -webkit-backdrop-filter:blur(28px) saturate(200%);
-  border:1.5px solid rgba(var(--rgb), var(--tile-border));
-  border-top-color:var(--glass-hi);
-  box-shadow:var(--shadow), 0 0 60px -20px rgba(var(--rgb), .5);
-  color:var(--ink);
-}
-.tile::before {
-  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-  background:linear-gradient(152deg,
-    rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 30%, transparent 55%);
-}
-.tile::after {
-  content:""; position:absolute; right:-12%; bottom:-22%;
-  width:60%; height:60%; border-radius:50%; pointer-events:none;
-  background:radial-gradient(circle, rgba(var(--rgb),.22) 0%, transparent 70%);
-}
-/* alternate the corner glow for the bottom row so vertically-stacked
-   tiles sharing a line color (WTC/Hoboken, 33rd/JSQ) read as distinct */
-.tile:nth-child(3)::after, .tile:nth-child(4)::after {
-  right:auto; left:-12%; bottom:auto; top:-22%;
-}
-/* slow ambient drift of the corner glow — barely-there life */
-.tile::after { animation:glowDrift 16s ease-in-out infinite alternate; }
-@keyframes glowDrift {
-  from { transform:translate(0,0) scale(1) }
-  to   { transform:translate(-7%,-6%) scale(1.14) }
-}
-/* staggered rise-in on first paint */
-.tile { animation:riseIn .7s cubic-bezier(.2,.7,.2,1) both; }
-.board > .tile:nth-child(1) { animation-delay:.04s }
-.board > .tile:nth-child(2) { animation-delay:.12s }
-.board > .tile:nth-child(3) { animation-delay:.20s }
-.board > .tile:nth-child(4) { animation-delay:.28s }
-@keyframes riseIn {
-  from { opacity:0; transform:translateY(20px) scale(.984) }
-  to   { opacity:1; transform:none }
-}
-
-/* ── TRAIN TILE CONTENT — everything bigger ─────────────────────── */
-.dest {
-  font-family:"Barlow Condensed",sans-serif;
-  font-weight:700; text-transform:uppercase;
-  letter-spacing:.05em; line-height:.95;
-  font-size:clamp(38px,7.8vmin,104px);
-  white-space:nowrap;
-  display:flex; align-items:center; gap:.34em;
-  position:relative; z-index:1;
-}
-.bullet {
-  width:.4em; height:.4em; border-radius:50%; flex-shrink:0;
-  background:rgb(var(--rgb));
-  box-shadow:0 0 .55em rgba(var(--rgb),.85), 0 0 .12em rgba(var(--rgb),.9);
-}
-.headsign {
-  margin-top:.3em; color:var(--sub);
-  font-weight:400; font-size:clamp(14px,2.2vmin,26px);
-  letter-spacing:.04em; position:relative; z-index:1;
-}
-.next {
-  flex:1; display:flex; align-items:center; justify-content:center;
-  gap:.12em; min-height:0; position:relative; z-index:1;
-  perspective:600px;
-}
-.mins {
-  font-weight:700; line-height:.74; letter-spacing:-.03em;
-  font-size:clamp(96px,26vmin,300px);
-  display:inline-block; transform-style:preserve-3d; backface-visibility:hidden;
-}
-.mins.flip { animation:flipDigit .6s ease; }
-@keyframes flipDigit {
-  0%   { transform:rotateX(0deg);    opacity:1 }
-  45%  { transform:rotateX(-100deg); opacity:.25 }
-  55%  { transform:rotateX(100deg);  opacity:.25 }
-  100% { transform:rotateX(0deg);    opacity:1 }
-}
-.unit {
-  font-family:"Barlow Condensed",sans-serif; font-weight:600;
-  text-transform:uppercase; letter-spacing:.08em;
-  color:var(--sub); font-size:clamp(19px,3.2vmin,40px);
-  align-self:flex-end; margin-bottom:.5em;
-}
-.due { color:rgb(var(--rgb)); filter:brightness(1.28) saturate(1.1) }
-:root[data-theme="light"] .due { filter:brightness(.78) saturate(1.3) }
-.pulse { animation:pulse 1.6s ease-in-out infinite }
-@keyframes pulse { 50%{opacity:.38} }
-.tile:has(.due) { animation:tileGlow 1.6s ease-in-out infinite }
-@keyframes tileGlow {
-  50% { box-shadow:var(--shadow), 0 0 90px -10px rgba(var(--rgb),.9) }
-}
-
-.then {
-  color:var(--sub); font-weight:400;
-  font-size:clamp(21px,3.6vmin,44px);
-  letter-spacing:.02em; min-height:1.2em; text-align:center;
-  position:relative; z-index:1;
-  padding-top:clamp(4px,.6vmin,8px);
-}
-.then .eta {
-  color:var(--ink); font-weight:600; opacity:.92;
-  font-size:clamp(25px,4.2vmin,52px);
-}
-.then .miss { color:var(--ghost); text-decoration:line-through }
-.then .sched { opacity:.75; font-style:italic }
-.then .dot  { color:var(--ghost); margin:0 .4em }
-.empty .mins { color:var(--ghost); font-size:clamp(52px,12vmin,130px) }
-.empty .then .eta { color:var(--sub); font-weight:600; opacity:.78 }
-
-/* ── TIME TILE ──────────────────────────────────────────────────── */
-#tile-time { --rgb:178,131,255; justify-content:center; align-items:center; text-align:center }
-.t-hm {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(64px,13.5vmin,160px); line-height:.9;
-  letter-spacing:-.02em; color:var(--ink);
-  position:relative; z-index:1;
-}
-.t-sec {
-  font-family:"Barlow",sans-serif; font-weight:500;
-  font-size:clamp(22px,4vmin,48px); color:var(--sub);
-  position:relative; z-index:1; margin-top:.22em;
-}
-.t-date {
-  font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(24px,4.8vmin,56px); color:var(--sub);
-  letter-spacing:.08em; text-transform:uppercase;
-  white-space:nowrap;
-  position:relative; z-index:1; margin-top:.85em;
-}
-.t-status {
-  position:relative; z-index:1; margin-top:1.1em;
-  font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(13px,2vmin,22px); letter-spacing:.06em; text-transform:uppercase;
-  padding:.4em 1em; border-radius:999px; max-width:92%;
-  color:rgb(120,200,80); background:rgba(120,200,80,.14);
-  border:1px solid rgba(120,200,80,.5);
-}
-.t-status[hidden] { display:none }
-.t-status.collapsed {
-  color:rgb(255,184,40); background:rgba(255,184,40,.14);
-  border-color:rgba(255,184,40,.5);
-}
-
-/* ── WEATHER TILE ───────────────────────────────────────────────── */
-#tile-weather { --rgb:55,138,221; justify-content:center; align-items:center; text-align:center }
-.w-uv {
-  position:absolute; top:clamp(14px,2.2vmin,26px); right:clamp(14px,2.2vmin,26px);
-  z-index:2; font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(11px,1.7vmin,19px); letter-spacing:.07em; text-transform:uppercase;
-  padding:.3em .8em; border-radius:999px; white-space:nowrap;
-  border:1px solid currentColor;
-}
-.w-uv[hidden] { display:none }
-.w-icon {
-  width:clamp(54px,9.5vmin,112px); height:clamp(54px,9.5vmin,112px);
-  margin:0 auto .1em; color:var(--ink); opacity:.92;
-  position:relative; z-index:1;
-}
-.w-icon svg { width:100%; height:100%; display:block }
-.w-temp {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(64px,13.5vmin,160px); line-height:.9;
-  letter-spacing:-.02em; color:var(--ink);
-  position:relative; z-index:1;
-}
-.w-temp sup { font-size:.45em; font-weight:600; vertical-align:.5em }
-.w-cond {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(19px,3.2vmin,38px); color:var(--ink); opacity:.85;
-  position:relative; z-index:1; margin-top:.3em;
-}
-.w-range {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(15px,2.4vmin,28px); color:var(--sub);
-  position:relative; z-index:1; margin-top:.55em; letter-spacing:.03em;
-}
-.w-extra {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(13px,2vmin,22px); color:var(--sub);
-  position:relative; z-index:1; margin-top:.35em; letter-spacing:.03em;
-  opacity:.8;
-}
-.w-tomorrow {
-  display:flex; align-items:center; justify-content:center; gap:.5em;
-  position:relative; z-index:1; margin-top:.7em;
-  padding-top:.6em; border-top:1px solid rgba(var(--rgb),.25);
-}
-.w-tomorrow[hidden] { display:none }
-.w-tomorrow .w-tom-icon {
-  width:clamp(20px,3.6vmin,40px); height:clamp(20px,3.6vmin,40px);
-  color:var(--sub); opacity:.85; flex-shrink:0;
-}
-.w-tomorrow .w-tom-icon svg { width:100%; height:100%; display:block }
-.w-tomorrow .w-tom-text {
-  font-family:"Barlow",sans-serif; font-weight:600;
-  font-size:clamp(14px,2.2vmin,24px); color:var(--sub);
-  letter-spacing:.03em;
-}
-.w-tomorrow .w-tom-text b { color:var(--ink); font-weight:700 }
-
-/* ── FOOTER (slim) ──────────────────────────────────────────────── */
-.foot {
+/* ── HEADER ──────────────────────────────────────────────────────── */
+.hdr{
   flex-shrink:0;
-  display:flex; align-items:center; justify-content:space-between;
-  padding:clamp(8px,1.2vmin,14px) clamp(18px,2.8vmin,32px);
-  padding-bottom:max(clamp(8px,1.2vmin,14px), env(safe-area-inset-bottom));
-  background:var(--foot-bg);
-  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-  border-top:1px solid var(--foot-edge);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 30px;border-bottom:1px solid #1c1e20;
 }
-.status { display:flex; align-items:center; gap:.5em }
-.led-dot {
-  width:.55em; height:.55em; border-radius:50%;
-  background:#44D07A; box-shadow:0 0 7px #44D07A; flex-shrink:0;
-}
-.is-stale .led-dot { background:var(--stale); box-shadow:0 0 7px var(--stale) }
-.status-txt {
-  font-family:"Barlow",sans-serif; font-weight:400;
-  font-size:clamp(12px,1.5vmin,15px); letter-spacing:.04em;
-  color:var(--ghost);
-}
-.badge {
-  background:var(--amber); color:#080808;
-  font-weight:700; text-transform:uppercase;
-  letter-spacing:.1em; padding:.2em .55em;
-  border-radius:5px; font-size:.86em;
-}
-.badge[hidden] { display:none }
-#theme-toggle {
-  background:none; border:none; cursor:pointer;
-  padding:.18em .4em; font-size:clamp(15px,2vmin,21px);
-  color:var(--ghost); border-radius:6px; line-height:1; transition:color .2s;
-}
-#theme-toggle:hover { color:var(--ink) }
+.hdr-brand{display:flex;align-items:baseline;gap:14px}
+.hdr-name{font-family:'Barlow Condensed';font-weight:700;font-size:24px;letter-spacing:.06em;color:#eceae6}
+.hdr-line{font-size:10px;letter-spacing:.32em;color:#5a5f62}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.hdr-live{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.2em;color:#6b7072;white-space:nowrap}
+.led{width:7px;height:7px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
+.is-stale .led{background:#E8913C;animation:none}
+#demoBadge{font-size:9px;letter-spacing:.14em;color:#f0b429;background:rgba(240,180,41,.13);padding:3px 8px;border-radius:4px}
+#demoBadge[hidden]{display:none}
 
-/* ── BIKE BAR ───────────────────────────────────────────────────── */
-.bike-bar {
+/* ── COLUMNS ─────────────────────────────────────────────────────── */
+.cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 0.95fr}
+
+/* ── TRAIN TILE ──────────────────────────────────────────────────── */
+.col-tile{border-right:1px solid #1c1e20;padding:22px 26px;display:flex;flex-direction:column}
+#tile0{border-left:5px solid #65C100}
+#tile1{border-left:5px solid #FFC72C;background:#0d0e0a}
+
+.t-head{display:flex;align-items:center;gap:11px}
+.t-arrow{flex-shrink:0}
+.t-dest{font-family:'Barlow Condensed';font-weight:700;font-size:38px;line-height:1}
+#tile0 .t-dest{color:#7ed320}
+#tile1 .t-dest{color:#FFC72C}
+.t-sub{font-size:10px;letter-spacing:.24em;margin:5px 0 0 43px}
+#tile0 .t-sub{color:#5a5f62}
+#tile1 .t-sub{color:#6b6a4a}
+
+.flap-wrap{flex:1;display:flex;align-items:center;gap:14px;min-height:0}
+.flap-box{
+  position:relative;width:178px;height:246px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+#tile0 .flap-box{background:#141618;border:1px solid #26292d}
+#tile1 .flap-box{background:#1a1706;border:1px solid #4a3d0e}
+.flap-box.urgent{animation:urgentPulse 1.4s ease infinite}
+.flap-num{
+  font-family:'Barlow Condensed';font-weight:700;
+  font-size:210px;line-height:1;user-select:none;
+}
+#tile0 .flap-num{color:#fff}
+#tile1 .flap-num{color:#FFC72C}
+.flap-num.flip{animation:flapIn .45s ease}
+.flap-line{position:absolute;left:0;right:0;top:50%;height:2px}
+#tile0 .flap-line{background:#0a0b0c}
+#tile1 .flap-line{background:#0d0e0a}
+.flap-aside{display:flex;flex-direction:column;gap:9px}
+.flap-unit{font-family:'Barlow Condensed';font-weight:500;font-size:22px}
+#tile0 .flap-unit{color:#9a9f9f}
+#tile1 .flap-unit{color:#b89a3a}
+
+.then-row{display:flex;align-items:center;gap:12px;padding-top:12px}
+#tile0 .then-row{border-top:1px solid #1c1e20}
+#tile1 .then-row{border-top:1px solid #2a2508}
+.tile-badge{font-size:9px;letter-spacing:.14em;padding:5px 10px;border-radius:100px;white-space:nowrap}
+.badge-scheduled{color:#7ed320;background:rgba(101,193,0,.13)}
+.badge-boarding {color:#FFC72C;background:rgba(255,199,44,.13)}
+.badge-live     {color:#9a9f9f;background:rgba(154,159,159,.12)}
+.then-label{font-size:10px;letter-spacing:.14em;flex-shrink:0}
+#tile0 .then-label{color:#5a5f62}
+#tile1 .then-label{color:#6b6a4a}
+.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:26px}
+#tile0 .then-times{color:#c9ccc8}
+#tile1 .then-times{color:#d8c579}
+
+/* ── RIGHT RAIL ──────────────────────────────────────────────────── */
+.rail{display:flex;flex-direction:column;gap:10px;padding:14px;min-height:0;overflow:hidden}
+
+/* Time block */
+.time-blk{background:#101113;border:1px solid #1c1e20;border-radius:18px;padding:14px 18px;flex-shrink:0}
+.clk-row{display:flex;align-items:baseline;justify-content:space-between}
+.clk-hm{font-family:'Barlow Condensed';font-weight:600;font-size:58px;line-height:.8;color:#eceae6}
+.clk-sec{font-size:14px;color:#7ed320;margin-left:2px}
+.clk-meta{text-align:right;font-size:10px;letter-spacing:.16em;color:#9a9f9f;line-height:1.6}
+.clk-ampm{color:#5a5f62;display:block}
+
+.sun-arc{position:relative;height:62px;margin-top:8px}
+.arc-left{position:absolute;left:0;bottom:-2px;font-size:9px;color:#5a5f62}
+.arc-right{position:absolute;right:0;bottom:-2px;text-align:right;font-size:9px;color:#5a5f62}
+.arc-val{font-family:'Barlow Condensed';font-weight:600;font-size:14px;color:#cfd2d0}
+.arc-center{position:absolute;left:0;right:0;top:35px;text-align:center;font-size:9px;letter-spacing:.1em;color:#6b7072}
+
+.svc-pill{margin-top:10px;display:inline-flex;align-items:center;gap:8px;border:1px solid #2c4a12;padding:5px 10px;border-radius:100px}
+.svc-dot{width:6px;height:6px;border-radius:50%;background:#65C100;animation:softGlow 2s ease infinite;flex-shrink:0}
+.svc-txt{font-size:10px;letter-spacing:.12em;color:#7ed320}
+.svc-pill.collapsed{border-color:#4a3a12}
+.svc-pill.collapsed .svc-dot{background:#E8913C;animation:none}
+.svc-pill.collapsed .svc-txt{color:#E8913C}
+
+/* Weather block */
+.wx-blk{
+  flex:1;min-height:0;
+  background:#101113;border:1px solid #1c1e20;border-radius:18px;
+  padding:14px 18px;position:relative;
+  display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;
+}
+.wx-uv{position:absolute;top:14px;right:14px;font-size:9px;letter-spacing:.06em;border:1px solid;padding:4px 8px;border-radius:100px}
+.wx-uv[hidden]{display:none}
+.wx-main{display:flex;align-items:center;gap:12px}
+.wx-icon{width:46px;height:46px;flex-shrink:0}
+.wx-icon svg{width:100%;height:100%;display:block}
+.wx-temp-row{display:flex;align-items:baseline;gap:8px}
+.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:66px;line-height:.78;color:#eceae6}
+.wx-feels{font-size:11px;color:#8a8f8a}
+.wx-desc{font-size:12px;color:#cfd2d0;margin-top:8px;line-height:1.4}
+.wx-sub{font-size:10px;letter-spacing:.06em;color:#6b7072;margin-top:4px}
+
+.wx-hourly{border-top:1px solid #1c1e20;padding-top:10px}
+.wx-hourly-lbl{font-size:9px;letter-spacing:.2em;color:#5a5f62;margin-bottom:9px}
+.hourly-strip{position:relative}
+.hourly-line{position:absolute;left:12px;right:12px;top:27px;height:2px;background:linear-gradient(90deg,#4a3d0e,#7a6420,#4a3d0e);z-index:0}
+.hourly-cells{position:relative;z-index:1;display:flex;justify-content:space-between}
+.hourly-cell{display:flex;flex-direction:column;align-items:center;gap:6px}
+.hourly-hr{font-size:9px;color:#6b7072}
+.hourly-icon{background:#101113;padding:0 2px;display:flex;width:16px;height:16px}
+.hourly-icon svg{width:100%;height:100%}
+.hourly-temp{font-family:'Barlow Condensed';font-weight:600;font-size:15px;color:#dcdedb}
+
+.wx-forecast{border-top:1px solid #1c1e20;padding-top:10px}
+.wx-forecast-lbl{font-size:9px;letter-spacing:.2em;color:#5a5f62;margin-bottom:9px}
+.fc-rows{display:flex;flex-direction:column;gap:8px}
+.fc-row{display:flex;align-items:center;gap:10px}
+.fc-day{width:42px;font-size:10px;letter-spacing:.04em}
+.fc-icon{display:flex;width:15px;height:15px;flex-shrink:0}
+.fc-icon svg{width:100%;height:100%}
+.fc-lo{width:26px;text-align:right;font-family:'Barlow Condensed';font-weight:600;font-size:15px;color:#8a8f8a}
+.fc-bar{flex:1;height:5px;border-radius:4px;background:linear-gradient(90deg,#3a7d4f,#c9a13a,#FFC72C)}
+.fc-hi{width:26px;font-family:'Barlow Condensed';font-weight:700;font-size:17px;color:#eceae6}
+
+/* ── BIKE FOOTER ─────────────────────────────────────────────────── */
+#bike-bar{
   flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  gap:clamp(12px,2.2vmin,24px);
-  padding:clamp(7px,1.1vmin,12px) clamp(18px,2.8vmin,32px);
-  background:var(--foot-bg);
-  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-  border-top:1px solid var(--foot-edge);
+  display:flex;align-items:center;justify-content:center;
+  gap:20px;padding:6px 30px;
+  border-top:1px solid #1c1e20;
+  font-size:10px;letter-spacing:.14em;color:#6b7072;
 }
-.bike-seg { display:flex; align-items:center; gap:.4em; }
-.bike-icon { width:1.1em; height:1.1em; flex-shrink:0; color:var(--ghost); }
-.bike-icon svg { width:100%; height:100%; display:block }
-.bike-label {
-  font-family:"Barlow",sans-serif; font-weight:400;
-  font-size:clamp(11px,1.65vmin,16px); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ghost);
-}
-.bike-count {
-  font-family:"Barlow",sans-serif; font-weight:700;
-  font-size:clamp(13px,1.9vmin,18px); color:var(--ink);
-}
-.bike-count.zero { color:var(--stale) }
-.bike-unit {
-  font-family:"Barlow",sans-serif; font-weight:400;
-  font-size:clamp(10px,1.45vmin,14px); color:var(--ghost);
-}
-.bike-divider { color:var(--ghost); opacity:.35; font-weight:300; user-select:none }
+.bike-seg{display:flex;align-items:center;gap:5px}
+.bike-icon{width:13px;height:13px;flex-shrink:0;color:#5a5f62}
+.bike-icon svg{width:100%;height:100%;display:block}
+.bike-label{color:#5a5f62}
+.bike-count{color:#cfd2d0;font-weight:600}
+.bike-count.zero{color:#E8913C}
+.bike-unit{color:#5a5f62}
+.bike-divider{color:#3a3d40;font-weight:300}
 
-#night {
-  position:fixed; inset:0; background:#000;
-  opacity:0; pointer-events:none;
-  transition:opacity 2s ease; z-index:50;
-}
-/* ── GRAIN OVERLAY (subtle texture, breaks up flat gradients) ────── */
-#grain {
-  position:fixed; inset:0; pointer-events:none; z-index:40;
-  opacity:.05; mix-blend-mode:overlay;
+/* ── OVERLAYS ────────────────────────────────────────────────────── */
+#night{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 2s ease;z-index:50}
+#grain{
+  position:fixed;inset:0;pointer-events:none;z-index:40;
+  opacity:.05;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size:180px 180px;
 }
-:root[data-theme="light"] #grain { opacity:.035; mix-blend-mode:multiply }
-@media (prefers-reduced-motion:reduce) {
-  .pulse { animation:none }
-  .mins.flip { animation:none }
-  .tile, .tile::after, .tile:has(.due) { animation:none }
-  #night { transition:none }
+@media(prefers-reduced-motion:reduce){
+  .flap-num.flip,.flap-box.urgent,#night{animation:none;transition:none}
 }
 </style>
 </head>
 <body>
-  <div id="app">
-    <div class="board" id="board">
-      <!-- 4 train tiles injected by JS -->
-      <div class="tile" id="tile-time">
-        <div class="t-hm" id="t-hm">--:--</div>
-        <div class="t-sec" id="t-sec">--</div>
-        <div class="t-date" id="t-date">—</div>
-        <div class="t-status" id="t-status" hidden></div>
+<div id="stage">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-brand">
+      <span class="hdr-name">NEWPORT</span>
+      <span class="hdr-line">PATH · DEPARTURES</span>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-live">
+        <span class="led"></span>LIVE · <span id="hdr-ago">—</span>
+        <span id="demoBadge" hidden>DEMO</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- 3-COLUMN BODY -->
+  <div class="cols">
+    <!-- WTC -->
+    <div class="col-tile" id="tile0">
+      <div class="t-head">
+        <svg class="t-arrow" width="32" height="24" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#65C100"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#65C100"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0a0b0c" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="t-dest">WTC</span>
       </div>
-      <div class="tile" id="tile-weather">
-        <div class="w-uv" id="w-uv" hidden></div>
-        <div class="w-icon" id="w-icon"></div>
-        <div class="w-temp" id="w-temp">--<sup>°</sup></div>
-        <div class="w-cond" id="w-cond">—</div>
-        <div class="w-range" id="w-range"></div>
-        <div class="w-extra" id="w-extra"></div>
-        <div class="w-tomorrow" id="w-tomorrow" hidden>
-          <div class="w-tom-icon" id="w-tom-icon"></div>
-          <div class="w-tom-text" id="w-tom-text"></div>
+      <div class="t-sub">WORLD TRADE CENTER</div>
+      <div class="flap-wrap">
+        <div class="flap-box">
+          <span class="flap-num" id="fn-0">—</span>
+          <span class="flap-line"></span>
         </div>
+        <div class="flap-aside">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#65C100" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#65C100" stroke="none"/></svg>
+          <span class="flap-unit">minutes</span>
+        </div>
+      </div>
+      <div class="then-row">
+        <span class="tile-badge badge-scheduled" id="badge-0">—</span>
+        <span class="then-label">THEN</span>
+        <span class="then-times" id="then-0">—</span>
       </div>
     </div>
 
-    <div class="bike-bar" id="bike-bar"></div>
+    <!-- 33 ST -->
+    <div class="col-tile" id="tile1">
+      <div class="t-head">
+        <svg class="t-arrow" width="32" height="24" viewBox="0 0 34 26"><path d="M2 2 h18 l12 11 -12 11 H2 Z" fill="#FFC72C"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FFC72C"/><path d="M8 12h7m-3.5-3.5L15.5 12l-3.5 3.5" stroke="#0d0e0a" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="t-dest">33 ST</span>
+      </div>
+      <div class="t-sub" id="sub-1">33RD STREET</div>
+      <div class="flap-wrap">
+        <div class="flap-box" id="flap-box-1">
+          <span class="flap-num" id="fn-1">—</span>
+          <span class="flap-line"></span>
+        </div>
+        <div class="flap-aside">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#FFC72C" stroke="none"/></svg>
+          <span class="flap-unit">minutes</span>
+        </div>
+      </div>
+      <div class="then-row">
+        <span class="tile-badge badge-scheduled" id="badge-1">—</span>
+        <span class="then-label">THEN</span>
+        <span class="then-times" id="then-1">—</span>
+      </div>
+    </div>
 
-    <footer class="foot">
-      <span class="status">
-        <span class="led-dot"></span>
-        <span class="status-txt" id="updated">connecting…</span>
-        <span class="badge" id="demoBadge" hidden>Demo</span>
-      </span>
-      <button id="theme-toggle" title="Toggle light / dark">◑</button>
-    </footer>
+    <!-- RIGHT RAIL -->
+    <div class="rail">
+      <!-- Time -->
+      <div class="time-blk">
+        <div class="clk-row">
+          <div><span class="clk-hm" id="clk-hm">—:——</span><span class="clk-sec" id="clk-sec">:00</span></div>
+          <div class="clk-meta"><span id="clk-date">— · — —</span><span class="clk-ampm" id="clk-ampm">—</span></div>
+        </div>
+        <div class="sun-arc">
+          <svg viewBox="0 0 300 82" width="100%" height="60" preserveAspectRatio="none" style="overflow:visible">
+            <path d="M8 74 Q150 -6 292 74" fill="none" stroke="#3a3d22" stroke-width="2"/>
+            <path id="sun-progress" d="M8 74 Q150 -6 292 74" fill="none" stroke="#f0b429" stroke-width="2.5" stroke-dasharray="0 400"/>
+            <circle id="sun-dot" cx="8" cy="74" r="6" fill="#f0b429" style="display:none"/>
+          </svg>
+          <div class="arc-left"><span class="arc-val" id="arc-rise">—</span></div>
+          <div class="arc-right"><span class="arc-val" id="arc-set">—</span></div>
+          <div class="arc-center" id="arc-daylight">— DAYLIGHT</div>
+        </div>
+        <div class="svc-pill" id="svc-pill">
+          <span class="svc-dot"></span>
+          <span class="svc-txt" id="svc-txt">CONNECTING…</span>
+        </div>
+      </div>
+      <!-- Weather -->
+      <div class="wx-blk">
+        <span class="wx-uv" id="wx-uv" hidden></span>
+        <div>
+          <div class="wx-main">
+            <div class="wx-icon" id="wx-icon"></div>
+            <div>
+              <div class="wx-temp-row">
+                <span class="wx-temp" id="wx-temp">—°</span>
+                <span class="wx-feels" id="wx-feels"></span>
+              </div>
+            </div>
+          </div>
+          <div class="wx-desc" id="wx-desc">Loading…</div>
+          <div class="wx-sub"  id="wx-sub"></div>
+        </div>
+        <div class="wx-hourly">
+          <div class="wx-hourly-lbl">HOURLY</div>
+          <div class="hourly-strip">
+            <div class="hourly-line"></div>
+            <div class="hourly-cells" id="hourly-cells"></div>
+          </div>
+        </div>
+        <div class="wx-forecast">
+          <div class="wx-forecast-lbl">NEXT DAYS</div>
+          <div class="fc-rows" id="forecast-rows"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="night"></div>
-  <div id="grain"></div>
+
+  <!-- BIKE BAR -->
+  <div id="bike-bar"></div>
+</div>
+<div id="night"></div>
+<div id="grain"></div>
 
 <script>
-/* ── THEME ──────────────────────────────────────────────────────── */
-function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
-  document.getElementById("tc").content = t === "dark" ? "#040810" : "#F0F4FA";
+/* ── STAGE FIT ───────────────────────────────────────────────────── */
+function fitStage() {
+  const s = document.getElementById('stage');
+  if (!s) return;
+  const k = Math.min(window.innerWidth / 1133, window.innerHeight / 744);
+  s.style.transform = 'translate(-50%,-50%) scale(' + k + ')';
 }
-let forced = null;
-applyTheme(window.matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
-window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change", e => {
-  if (!forced) applyTheme(e.matches ? "dark" : "light");
-});
-document.getElementById("theme-toggle").addEventListener("click", () => {
-  forced = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(forced);
-});
+fitStage();
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', fitStage);
 
-/* ── CONFIG ─────────────────────────────────────────────────────── */
+/* ── CONFIG ──────────────────────────────────────────────────────── */
 const CONFIG = {
   API_BASE:        "https://path.abhishekmangla59.workers.dev",
   POLL_SECONDS:    60,
@@ -441,539 +345,506 @@ const CONFIG = {
   NIGHT_DIM_START: 23,
   NIGHT_DIM_END:   6,
   NIGHT_DIM_OPACITY: 0.35,
-
   DEPARTURES_SHOWN: 3,
-  MAX_LOOKAHEAD_MINUTES: 120, // hide scheduled departures further out than this
-  FALLBACK_HEADWAY_MINUTES: 20, // even-headway estimate when neither live nor
-                                // timetable can supply a headway (e.g. weekend WTC)
-
-  // Newport, Jersey City — for the weather tile (Open-Meteo, free, no key)
+  MAX_LOOKAHEAD_MINUTES: 120,
+  FALLBACK_HEADWAY_MINUTES: 20,
   LAT: 40.7270, LON: -74.0335,
-  WEATHER_MINUTES: 10,      // weather refresh cadence
-  WEATHER_TOMORROW_HOUR: 20, // show tomorrow's forecast from 8pm onward
-
+  WEATHER_MINUTES: 10,
   BIKE_MINUTES: 5,
   BIKE_ANCHORS: [
     { label:"Newport",  role:"bikes", lat:40.7270, lon:-74.0335, radius:0.35 },
     { label:"Hoboken",  role:"docks", lat:40.7358, lon:-74.0281, radius:0.45 },
     { label:"Exch Pl",  role:"docks", lat:40.7167, lon:-74.0326, radius:0.40 },
   ],
-
   TILES: [
     { label:"WTC",        sub:"World Trade Center", dir:"TO_NY", match:/world trade|wtc/i, rgb:"101,193,0",  sched:"WTC" },
     { label:"33 St",      sub:"33rd Street",        dir:"TO_NY", match:/33|thirty/i,       rgb:"255,199,44", sched:"33"  },
-    // Temporarily hidden — set hidden:false to bring these back (layout reverts
-    // to the 6-tile grid automatically once more than 2 train tiles are shown).
     { label:"Hoboken",    sub:"Hoboken Terminal",   dir:"TO_NJ", match:/^hoboken/i,        rgb:"101,193,0",  sched:"HOB", hidden:true },
     { label:"Journal Sq", sub:"Journal Square",     dir:"TO_NJ", match:/journal/i,         rgb:"255,199,44", sched:"JSQ", hidden:true },
   ],
 };
 
-/* ── EMBEDDED SCHEDULE ──────────────────────────────────────────── */
-// Real Newport departure times (minutes after midnight) scraped from PATH's
-// official weekday + weekend timetables. Drives the next scheduled departures,
-// blended with the live feed — and a graceful fallback when the feed is quiet.
+/* ── EMBEDDED SCHEDULE ───────────────────────────────────────────── */
 const SCHED = {
   weekday: { WTC:"376,386,396,406,416,426,436,446,456,462,468,474,480,486,492,498,504,510,516,522,528,534,540,546,552,558,564,570,578,587,596,608,623,638,653,668,683,698,713,728,743,758,773,788,803,818,833,848,863,878,893,907,920,933,946,958,970,980,990,1000,1010,1019,1027,1035,1043,1051,1059,1067,1075,1083,1091,1099,1107,1115,1123,1133,1145,1157,1169,1181,1193,1205,1217,1229,1241,1253,1265,1277,1292,1307,1322,1337,1352,1367,1382,1397", "33":"18,58,98,138,178,218,258,298,333,347,357,367,377,387,397,402,407,412,417,422,427,432,437,442,447,452,457,461,465,469,473,477,481,485,489,493,497,501,505,509,513,517,521,525,529,533,537,541,545,549,554,559,564,569,574,579,584,589,596,608,620,632,644,656,668,680,692,704,716,728,740,752,764,776,788,800,812,824,836,848,860,872,884,896,908,917,927,937,947,957,962,967,972,977,982,987,992,997,1002,1007,1012,1017,1022,1027,1032,1037,1042,1047,1052,1057,1062,1067,1072,1077,1082,1087,1092,1097,1102,1107,1112,1117,1122,1127,1132,1137,1147,1157,1167,1177,1187,1197,1208,1220,1232,1244,1256,1268,1280,1292,1304,1316,1328,1340,1355,1368,1388,1408,1428", HOB:"18,58,98,138,178,218,258,298,333,347,364,374,384,394,404,414,424,434,444,454,463,468,474,480,486,492,498,504,510,516,522,528,534,540,546,552,558,566,575,584,596,608,620,635,650,665,679,694,709,724,739,754,769,784,799,814,829,844,859,874,889,904,919,931,943,955,967,977,987,995,1003,1011,1019,1027,1035,1043,1051,1059,1067,1075,1083,1091,1099,1107,1115,1124,1134,1144,1154,1166,1178,1190,1202,1214,1226,1238,1250,1262,1274,1286,1298,1313,1328,1343,1363,1368,1383,1388,1408,1428", JSQ:"18,37,70,110,150,190,230,270,310,351,371,391,392,402,412,422,430,435,440,445,450,455,460,465,470,475,480,485,490,495,500,504,508,512,516,520,524,528,532,536,540,544,548,552,556,560,564,568,572,576,580,584,588,592,597,602,607,614,622,632,644,656,668,680,692,704,716,728,740,752,764,776,788,800,812,824,836,848,860,872,884,896,908,922,932,942,952,962,972,982,992,997,1002,1007,1012,1017,1022,1027,1032,1037,1042,1047,1052,1057,1062,1067,1072,1077,1082,1087,1092,1097,1102,1107,1112,1117,1122,1127,1132,1137,1142,1147,1152,1157,1162,1167,1172,1182,1192,1202,1212,1222,1232,1244,1256,1268,1280,1292,1304,1316,1328,1340,1352,1364,1388,1403,1418,1438" },
   sat: { WTC:"", "33":"28,68,108,148,188,228,268,308,348,388,418,448,468,488,508,528,548,568,588,608,618,628,638,648,658,668,678,688,698,708,718,728,738,748,758,768,778,788,798,808,818,828,838,848,858,868,878,888,898,908,918,928,938,948,958,968,978,988,998,1008,1018,1028,1038,1048,1058,1068,1078,1088,1098,1108,1118,1128,1138,1148,1158,1168,1178,1188,1198,1208,1218,1228,1238,1248,1258,1268,1280,1292,1304,1318,1338,1358,1378,1398,1418,1438", HOB:"28,68,108,148,188,228,268,308,348,388,418,448,468,488,508,528,548,568,588,608,618,628,638,648,658,668,678,688,698,708,718,728,738,748,758,768,778,788,798,808,818,828,838,848,858,868,878,888,898,908,918,928,938,948,958,968,978,988,998,1008,1018,1028,1038,1048,1058,1068,1078,1088,1098,1108,1118,1128,1138,1148,1158,1168,1178,1188,1198,1208,1218,1228,1238,1248,1258,1268,1280,1292,1304,1318,1338,1358,1378,1398,1418,1438", JSQ:"11,40,81,121,161,201,241,281,321,361,401,441,471,501,521,541,561,581,601,621,641,661,671,681,691,701,711,721,731,741,751,761,771,781,791,801,811,821,831,841,851,861,871,881,891,901,911,921,931,941,951,961,971,981,991,1001,1011,1021,1031,1041,1051,1061,1071,1081,1091,1101,1111,1121,1131,1141,1151,1161,1171,1181,1191,1201,1211,1221,1231,1241,1251,1261,1271,1281,1291,1301,1311,1321,1333,1345,1357,1371,1391,1411,1431" },
   sun: { WTC:"", "33":"8,28,48,68,88,108,128,168,208,248,288,328,368,408,448,488,528,568,588,608,628,644,658,668,678,688,698,708,718,728,738,748,758,768,778,788,798,808,818,828,838,848,858,868,878,888,898,908,918,928,938,948,958,968,978,988,998,1008,1018,1028,1038,1048,1058,1068,1078,1088,1098,1108,1118,1128,1138,1148,1158,1168,1178,1188,1198,1208,1223,1243,1263,1283,1303,1323,1343,1363,1383,1403,1428", HOB:"8,28,48,68,88,108,128,168,208,248,288,328,368,408,448,488,528,568,588,608,628,644,658,668,678,688,698,708,718,728,738,748,758,768,778,788,798,808,818,828,838,848,858,868,878,888,898,908,918,928,938,948,958,968,978,988,998,1008,1018,1028,1038,1048,1058,1068,1078,1088,1098,1108,1118,1128,1138,1148,1158,1168,1178,1188,1198,1208,1223,1243,1263,1283,1303,1323,1343,1363,1383,1403,1428", JSQ:"16,31,51,61,81,101,121,141,161,181,221,261,301,341,381,421,461,501,541,581,621,641,661,681,697,711,721,731,741,751,761,771,781,791,801,811,821,831,841,851,861,871,881,891,901,911,921,931,941,951,961,971,981,991,1001,1011,1021,1031,1041,1051,1061,1071,1081,1091,1101,1111,1121,1131,1141,1151,1161,1171,1181,1191,1201,1211,1221,1231,1241,1251,1261,1276,1296,1316,1336,1356,1376,1396,1416,1436" },
 };
-// Inflate the compact comma strings into number arrays once at load.
 for (const day in SCHED)
   for (const k in SCHED[day])
     SCHED[day][k] = SCHED[day][k] ? SCHED[day][k].split(",").map(Number) : [];
 
-function dayType(d) {
-  const g = d.getDay();
-  return g === 0 ? "sun" : g === 6 ? "sat" : "weekday";
-}
-function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
-function minutesToDate(dayRef, m) { const x = startOfDay(dayRef); x.setMinutes(m); return x; }
+function dayType(d) { const g=d.getDay(); return g===0?"sun":g===6?"sat":"weekday"; }
+function startOfDay(d) { const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function minutesToDate(dayRef, m) { const x=startOfDay(dayRef); x.setMinutes(m); return x; }
 
-// Next scheduled Newport departures (Date objects) for a tile, strictly after
-// `after`. Spills into tomorrow's timetable when today's trains run out.
 function scheduledDepartures(schedKey, now, after, limit) {
-  const out = [];
-  const afterMin = (after - startOfDay(now)) / 60000;
-  for (const m of (SCHED[dayType(now)][schedKey] || [])) {
-    if (m > afterMin) out.push(minutesToDate(now, m));
-    if (out.length >= limit) return out;
+  const out=[];
+  const afterMin=(after-startOfDay(now))/60000;
+  for (const m of (SCHED[dayType(now)][schedKey]||[])) {
+    if (m>afterMin) out.push(minutesToDate(now,m));
+    if (out.length>=limit) return out;
   }
-  const tmr = new Date(now); tmr.setDate(tmr.getDate() + 1);
-  for (const m of (SCHED[dayType(tmr)][schedKey] || [])) {
-    out.push(minutesToDate(tmr, m));
-    if (out.length >= limit) break;
+  const tmr=new Date(now); tmr.setDate(tmr.getDate()+1);
+  for (const m of (SCHED[dayType(tmr)][schedKey]||[])) {
+    out.push(minutesToDate(tmr,m));
+    if (out.length>=limit) break;
   }
   return out;
 }
 
-// Next scheduled departure for an empty tile, looking up to a few days ahead
-// (e.g. weekend WTC → next service is Monday morning). Returns "" if none.
 function nextServiceLabel(schedKey, d) {
   if (!schedKey) return "";
-  for (let off = 0; off < 4; off++) {
-    const day = new Date(d); day.setDate(day.getDate() + off);
-    const afterMin = off === 0 ? (d - startOfDay(d)) / 60000 : -1;
-    for (const m of (SCHED[dayType(day)][schedKey] || [])) {
-      if (m > afterMin) {
-        const arr = minutesToDate(day, m);
-        const t = arr.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-        return off === 0 ? `Next ~${t}`
-          : `Next ~${t} ${arr.toLocaleDateString("en-US",{weekday:"short"})}`;
+  for (let off=0; off<4; off++) {
+    const day=new Date(d); day.setDate(day.getDate()+off);
+    const afterMin=off===0?(d-startOfDay(d))/60000:-1;
+    for (const m of (SCHED[dayType(day)][schedKey]||[])) {
+      if (m>afterMin) {
+        const arr=minutesToDate(day,m);
+        const t=arr.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
+        return off===0?`~${t}`:`~${t} ${arr.toLocaleDateString("en-US",{weekday:"short"})}`;
       }
     }
   }
   return "";
 }
 
-// Current headway (minutes) for a line — median gap of its scheduled departures
-// over the next two hours TODAY (no spill to tomorrow, so it reflects the
-// service actually running now). null if fewer than two upcoming trains.
 function lineHeadwayMin(schedKey, d) {
   if (!schedKey) return null;
-  const nowMin = (d - startOfDay(d)) / 60000;
-  const up = (SCHED[dayType(d)][schedKey] || []).filter(m => m > nowMin && m < nowMin + 120);
-  if (up.length < 2) return null;
-  const gaps = [];
-  for (let i = 1; i < up.length; i++) gaps.push(up[i] - up[i-1]);
-  gaps.sort((a,b) => a - b);
-  return gaps[Math.floor(gaps.length / 2)];
+  const nowMin=(d-startOfDay(d))/60000;
+  const up=(SCHED[dayType(d)][schedKey]||[]).filter(m=>m>nowMin&&m<nowMin+120);
+  if (up.length<2) return null;
+  const gaps=[];
+  for (let i=1;i<up.length;i++) gaps.push(up[i]-up[i-1]);
+  gaps.sort((a,b)=>a-b);
+  return gaps[Math.floor(gaps.length/2)];
+}
+function serviceHeadwayMin(d) { return lineHeadwayMin("33",d); }
+
+function isCollapsedSchedule(d=new Date()) {
+  const hour=d.getHours()+d.getMinutes()/60;
+  return hour>=23||hour<6;
 }
 
-// Headway of the JSQ-33 line — drives the service-state line in the time tile.
-function serviceHeadwayMin(d) { return lineHeadwayMin("33", d); }
+/* ── BIKE ICONS + HELPERS ────────────────────────────────────────── */
+const ICON_BIKE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16" r="3.5"/><circle cx="19" cy="16" r="3.5"/><path d="M5 16l5-8h4"/><path d="M9 8l5 8"/><path d="M14 8h3l2 5"/></svg>`;
+const ICON_DOCK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V7h5a3 3 0 0 1 0 6H9"/></svg>`;
 
-/* ── BUILD TRAIN TILES ──────────────────────────────────────────── */
-let trains = [], lastGood = 0, usingDemo = false;
-
-const board = document.getElementById("board");
-const timeTile = document.getElementById("tile-time");
-CONFIG.TILES.forEach((t, i) => {
-  if (t.hidden) return;
-  const el = document.createElement("div");
-  el.className = "tile"; el.id = "tile" + i;
-  el.style.setProperty("--rgb", t.rgb);
-  el.innerHTML = `
-    <div class="dest"><span class="bullet"></span>${t.label}</div>
-    <div class="headsign">${t.sub}<span class="via" hidden> · via Hoboken</span></div>
-    <div class="next"><span class="mins">—</span><span class="unit"></span></div>
-    <div class="then"></div>`;
-  board.insertBefore(el, timeTile);
-});
-
-/* ── BIKE ICONS + HELPERS ───────────────────────────────────────── */
-const ICON_BIKE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16" r="3.5"/><circle cx="19" cy="16" r="3.5"/><path d="M5 16l5-8h4"/><path d="M9 8l5 8"/><path d="M14 8h3l2 5"/></svg>`;
-const ICON_DOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V7h5a3 3 0 0 1 0 6H9"/></svg>`;
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371, dl = (lat2-lat1)*Math.PI/180, dL = (lon2-lon1)*Math.PI/180;
-  const a = Math.sin(dl/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dL/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+function haversineKm(lat1,lon1,lat2,lon2) {
+  const R=6371,dl=(lat2-lat1)*Math.PI/180,dL=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dl/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dL/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-/* ── BUILD BIKE BAR ─────────────────────────────────────────────── */
-const bikeBar = document.getElementById("bike-bar");
-CONFIG.BIKE_ANCHORS.forEach((a, i) => {
-  if (i > 0) bikeBar.insertAdjacentHTML("beforeend",
-    `<span class="bike-divider">·</span>`);
+/* ── BUILD BIKE BAR ──────────────────────────────────────────────── */
+const bikeBar=document.getElementById("bike-bar");
+CONFIG.BIKE_ANCHORS.forEach((a,i)=>{
+  if(i>0) bikeBar.insertAdjacentHTML("beforeend",`<span class="bike-divider">·</span>`);
   bikeBar.insertAdjacentHTML("beforeend",
-    `<span class="bike-seg">` +
-    `<span class="bike-icon">${a.role === "bikes" ? ICON_BIKE : ICON_DOCK}</span>` +
-    `<span class="bike-label">${a.label}</span>` +
-    `<span class="bike-count" id="bk-${i}">—</span>` +
-    `<span class="bike-unit">${a.role === "bikes" ? "bikes" : "docks"}</span>` +
+    `<span class="bike-seg">`+
+    `<span class="bike-icon">${a.role==="bikes"?ICON_BIKE:ICON_DOCK}</span>`+
+    `<span class="bike-label">${a.label}</span>`+
+    `<span class="bike-count" id="bk-${i}">—</span>`+
+    `<span class="bike-unit">${a.role==="bikes"?"bikes":"docks"}</span>`+
     `</span>`);
 });
 
-/* ── FETCH TRAINS ───────────────────────────────────────────────── */
+/* ── FETCH TRAINS ────────────────────────────────────────────────── */
+let trains=[], lastGood=0, usingDemo=false;
+
 async function load() {
   try {
-    const res = await fetch(CONFIG.API_BASE, { cache:"no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if (!lastGood && !usingDemo) console.log("PATH feed:", data);
-    trains = normalize(data);
-    if (trains.length) { lastGood = Date.now(); usingDemo = false; toggleDemo(false); }
+    const res=await fetch(CONFIG.API_BASE,{cache:"no-store"});
+    if (!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    if (!lastGood&&!usingDemo) console.log("PATH feed:",data);
+    trains=normalize(data);
+    if (trains.length) { lastGood=Date.now(); usingDemo=false; toggleDemo(false); }
     else throw new Error("empty");
   } catch(err) {
-    console.warn("fetch failed:", err.message);
-    if (!lastGood) { trains = demo(); usingDemo = true; toggleDemo(true); lastGood = Date.now(); }
+    console.warn("fetch failed:",err.message);
+    if (!lastGood) { trains=demo(); usingDemo=true; toggleDemo(true); lastGood=Date.now(); }
   }
 }
 
-// The JSQ–33 St line consolidates through Hoboken ("via Hoboken") only during
-// the overnight window (~11PM-6AM, any day) — NOT all weekend. The live feed's
-// headsign is authoritative; this time check is just a fallback for when the
-// feed is down, and for labelling scheduled (non-live) departures overnight.
-function isCollapsedSchedule(d = new Date()) {
-  const hour = d.getHours() + d.getMinutes() / 60;
-  return hour >= 23 || hour < 6;
-}
-
 function normalize(data) {
-  const list = data?.upcomingTrains || data?.trains || data?.stations?.[0]?.upcomingTrains || [];
-  const out = [];
+  const list=data?.upcomingTrains||data?.trains||data?.stations?.[0]?.upcomingTrains||[];
+  const out=[];
   for (const t of list) {
-    const dir  = (t.direction || t.routeDirection || "").toUpperCase();
-    const sign = t.headsign || t.headSign || t.lineName || t.routeDisplayName || "";
-    const arr  = parseArrival(t);
+    const dir=(t.direction||t.routeDirection||"").toUpperCase();
+    const sign=t.headsign||t.headSign||t.lineName||t.routeDisplayName||"";
+    const arr=parseArrival(t);
     if (!arr) continue;
-    const idx = CONFIG.TILES.findIndex(tile => dir.includes(tile.dir) && tile.match.test(sign));
-    if (idx === -1) continue;
-    const onJsq33Line = CONFIG.TILES[idx].label === "33 St"
-                     || CONFIG.TILES[idx].label === "Journal Sq";
-    const viaHoboken = /via\s+hoboken/i.test(sign)
-      || (onJsq33Line && isCollapsedSchedule());
-    out.push({ destIdx:idx, arrival:arr, viaHoboken });
-
-    // Overnight/weekend: a "33rd St via Hoboken" train stops at Hoboken
-    // (the next stop after Newport) before continuing on, so it also
-    // counts as a Hoboken-bound departure.
-    if (viaHoboken && CONFIG.TILES[idx].label === "33 St") {
-      const hobokenIdx = CONFIG.TILES.findIndex(tile => tile.label === "Hoboken");
-      out.push({ destIdx:hobokenIdx, arrival:arr, viaHoboken:false });
+    const idx=CONFIG.TILES.findIndex(tile=>dir.includes(tile.dir)&&tile.match.test(sign));
+    if (idx===-1) continue;
+    const onJsq33Line=CONFIG.TILES[idx].label==="33 St"||CONFIG.TILES[idx].label==="Journal Sq";
+    const viaHoboken=/via\s+hoboken/i.test(sign)||(onJsq33Line&&isCollapsedSchedule());
+    out.push({destIdx:idx,arrival:arr,viaHoboken});
+    if (viaHoboken&&CONFIG.TILES[idx].label==="33 St") {
+      const hobokenIdx=CONFIG.TILES.findIndex(tile=>tile.label==="Hoboken");
+      out.push({destIdx:hobokenIdx,arrival:arr,viaHoboken:false});
     }
   }
   return out;
 }
 
 function parseArrival(t) {
-  const iso = t.projectedArrival || t.arrivalTime || t.expectedArrival;
-  if (iso) { const d = new Date(iso); if (!isNaN(d)) return d; }
-  const s = t.secondsToArrival ?? t.eta;
-  if (s != null && s !== "") { const n = parseInt(s,10); if (!isNaN(n)) return new Date(Date.now()+n*1000); }
-  const m = /(\d+)\s*min/i.exec(t.arrivalTimeMessage||"");
-  if (m) return new Date(Date.now() + parseInt(m[1],10)*60000);
+  const iso=t.projectedArrival||t.arrivalTime||t.expectedArrival;
+  if (iso) { const d=new Date(iso); if (!isNaN(d)) return d; }
+  const s=t.secondsToArrival??t.eta;
+  if (s!=null&&s!=="") { const n=parseInt(s,10); if (!isNaN(n)) return new Date(Date.now()+n*1000); }
+  const m=/(\d+)\s*min/i.exec(t.arrivalTimeMessage||"");
+  if (m) return new Date(Date.now()+parseInt(m[1],10)*60000);
   if (/now|due|board/i.test(t.arrivalTimeMessage||"")) return new Date();
   return null;
 }
 
-/* ── WEATHER (Open-Meteo — no key, CORS-friendly) ───────────────── */
-const WMO = {
-  0:"Clear", 1:"Mostly clear", 2:"Partly cloudy", 3:"Overcast",
-  45:"Fog", 48:"Fog", 51:"Drizzle", 53:"Drizzle", 55:"Drizzle",
-  56:"Freezing drizzle", 57:"Freezing drizzle",
-  61:"Light rain", 63:"Rain", 65:"Heavy rain",
-  66:"Freezing rain", 67:"Freezing rain",
-  71:"Light snow", 73:"Snow", 75:"Heavy snow", 77:"Snow",
-  80:"Showers", 81:"Showers", 82:"Heavy showers",
-  85:"Snow showers", 86:"Snow showers",
-  95:"Thunderstorm", 96:"Thunderstorm", 99:"Thunderstorm",
+/* ── WEATHER ICONS ───────────────────────────────────────────────── */
+const WMO={
+  0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",
+  45:"Fog",48:"Fog",51:"Drizzle",53:"Drizzle",55:"Drizzle",
+  61:"Light rain",63:"Rain",65:"Heavy rain",66:"Freezing rain",67:"Freezing rain",
+  71:"Light snow",73:"Snow",75:"Heavy snow",77:"Snow",
+  80:"Showers",81:"Showers",82:"Heavy showers",
+  85:"Snow showers",86:"Snow showers",
+  95:"Thunderstorm",96:"Thunderstorm",99:"Thunderstorm",
+};
+const I_SUN=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>`;
+const I_PARTLY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M9 1.5v1.3M9 13.7V15M2.5 8h1.3M14.7 8H16M4.6 3.6l.9.9M12.4 3.6l-.9.9"/><path d="M16.5 19a3 3 0 0 0 0-6 4.3 4.3 0 0 0-8 1.3A3.5 3.5 0 0 0 9 19h7.5Z"/></svg>`;
+const I_CLOUD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M17.5 18a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 18h11Z"/></svg>`;
+const I_RAIN=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M17.5 14a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 14h11Z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg>`;
+const I_SNOW=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M17.5 13a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 13h11Z"/><path d="M8 17v4M8 19l-1.5 1M8 19l1.5 1M12 17v4M12 19l-1.5 1M12 19l1.5 1M16 17v4M16 19l-1.5 1M16 19l1.5 1"/></svg>`;
+const I_THUNDER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M17.5 12.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 12.5h11Z"/><path d="M13 12l-3 5h3l-2 4"/></svg>`;
+const I_FOG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8h13M3 12h18M3 16h13"/></svg>`;
+const WMO_ICON={
+  0:I_SUN,1:I_SUN,2:I_PARTLY,3:I_CLOUD,
+  45:I_FOG,48:I_FOG,
+  51:I_RAIN,53:I_RAIN,55:I_RAIN,56:I_RAIN,57:I_RAIN,
+  61:I_RAIN,63:I_RAIN,65:I_RAIN,66:I_RAIN,67:I_RAIN,
+  80:I_RAIN,81:I_RAIN,82:I_RAIN,
+  71:I_SNOW,73:I_SNOW,75:I_SNOW,77:I_SNOW,85:I_SNOW,86:I_SNOW,
+  95:I_THUNDER,96:I_THUNDER,99:I_THUNDER,
 };
 
-/* line-art icons matching the board's stroke aesthetic */
-const ICON_SUN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>`;
-const ICON_PARTLY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M9 1.5v1.3M9 13.7V15M2.5 8h1.3M14.7 8H16M4.6 3.6l.9.9M12.4 3.6l-.9.9"/><path d="M16.5 19a3 3 0 0 0 0-6 4.3 4.3 0 0 0-8 1.3A3.5 3.5 0 0 0 9 19h7.5Z"/></svg>`;
-const ICON_CLOUD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 18a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 18h11Z"/></svg>`;
-const ICON_FOG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13M3 12h18M3 16h13"/></svg>`;
-const ICON_RAIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 14a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 14h11Z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg>`;
-const ICON_SNOW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 13a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 13h11Z"/><path d="M8 17v4M8 19l-1.5 1M8 19l1.5 1M12 17v4M12 19l-1.5 1M12 19l1.5 1M16 17v4M16 19l-1.5 1M16 19l1.5 1"/></svg>`;
-const ICON_THUNDER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 12.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6-1.5A4 4 0 0 0 6.5 12.5h11Z"/><path d="M13 12l-3 5h3l-2 4"/></svg>`;
-const WMO_ICON = {
-  0:ICON_SUN, 1:ICON_SUN, 2:ICON_PARTLY, 3:ICON_CLOUD,
-  45:ICON_FOG, 48:ICON_FOG,
-  51:ICON_RAIN, 53:ICON_RAIN, 55:ICON_RAIN, 56:ICON_RAIN, 57:ICON_RAIN,
-  61:ICON_RAIN, 63:ICON_RAIN, 65:ICON_RAIN, 66:ICON_RAIN, 67:ICON_RAIN,
-  80:ICON_RAIN, 81:ICON_RAIN, 82:ICON_RAIN,
-  71:ICON_SNOW, 73:ICON_SNOW, 75:ICON_SNOW, 77:ICON_SNOW, 85:ICON_SNOW, 86:ICON_SNOW,
-  95:ICON_THUNDER, 96:ICON_THUNDER, 99:ICON_THUNDER,
-};
+function uvLevel(uv) { return uv<=2?"Low":uv<=5?"Moderate":uv<=7?"High":uv<=10?"Very High":"Extreme"; }
+function uvColor(uv) { return uv<=2?"120,200,80":uv<=5?"240,190,40":uv<=7?"245,140,40":uv<=10?"240,80,80":"180,110,230"; }
 
-// WHO UV index bands.
-function uvLevel(uv) {
-  if (uv <= 2) return "Low";
-  if (uv <= 5) return "Moderate";
-  if (uv <= 7) return "High";
-  if (uv <= 10) return "Very High";
-  return "Extreme";
-}
-function uvColor(uv) {
-  if (uv <= 2) return "120,200,80";    // green
-  if (uv <= 5) return "240,190,40";    // yellow
-  if (uv <= 7) return "245,140,40";    // orange
-  if (uv <= 10) return "240,80,80";    // red
-  return "180,110,230";                // purple
+/* ── SUN ARC ─────────────────────────────────────────────────────── */
+function updateSunArc(sunrise, sunset) {
+  if (!sunrise||!sunset) return;
+  const riseDate=new Date(sunrise), setDate=new Date(sunset), now=new Date();
+  const fmt=dt=>{ const h=dt.getHours()%12||12, m=String(dt.getMinutes()).padStart(2,'0'); return h+':'+m; };
+  const g=id=>document.getElementById(id);
+  g('arc-rise').textContent=fmt(riseDate);
+  g('arc-set').textContent=fmt(setDate);
+  const ms=setDate-riseDate;
+  const dh=Math.floor(ms/3600000), dm=Math.floor((ms%3600000)/60000);
+  g('arc-daylight').textContent=dh+'h '+dm+'m DAYLIGHT';
+  let t=Math.max(0,Math.min(1,(now-riseDate)/(setDate-riseDate)));
+  const bx=(1-t)*(1-t)*8+2*(1-t)*t*150+t*t*292;
+  const by=(1-t)*(1-t)*74+2*(1-t)*t*(-6)+t*t*74;
+  const dot=g('sun-dot'), prog=g('sun-progress');
+  const visible=now>=riseDate&&now<=setDate;
+  dot.style.display=visible?'':'none';
+  prog.style.display=visible?'':'none';
+  if (visible) {
+    dot.setAttribute('cx',Math.round(bx));
+    dot.setAttribute('cy',Math.round(by));
+    prog.setAttribute('stroke-dasharray',Math.round(t*300)+' 400');
+  }
 }
 
+/* ── WEATHER ─────────────────────────────────────────────────────── */
 async function loadWeather() {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
-      + `&current=temperature_2m,weather_code,wind_speed_10m,uv_index`
-      + `&hourly=precipitation_probability`
-      + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
-      + `&timezone=America%2FNew_York&forecast_days=2`;
-    const res = await fetch(url, { cache:"no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const w = await res.json();
-    const temp = Math.round(w?.current?.temperature_2m);
-    const code = w?.current?.weather_code;
-    const wind = Math.round(w?.current?.wind_speed_10m);
-    const uv = Math.round(w?.current?.uv_index);
-    const hi = Math.round(w?.daily?.temperature_2m_max?.[0]);
-    const lo = Math.round(w?.daily?.temperature_2m_min?.[0]);
-
-    let rainTxt = "";
-    const times = w?.hourly?.time, probs = w?.hourly?.precipitation_probability;
-    if (times && probs) {
-      const now = new Date();
-      let best = -1, bestIdx = -1;
-      for (let i=0; i<times.length; i++) {
-        if (new Date(times[i]) < now) continue;
-        if (probs[i] > best) { best = probs[i]; bestIdx = i; }
-      }
-      if (bestIdx >= 0 && best > 0) {
-        const hour = new Date(times[bestIdx]).toLocaleTimeString("en-US",
-          { hour:"numeric", hour12:true, timeZone:"America/New_York" });
-        rainTxt = `${best}% rain at ${hour}`;
-      }
-    }
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
+      +`&current=temperature_2m,weather_code,wind_speed_10m,uv_index,apparent_temperature`
+      +`&hourly=temperature_2m,weather_code,precipitation_probability`
+      +`&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset`
+      +`&timezone=America%2FNew_York&forecast_days=4`;
+    const res=await fetch(url,{cache:"no-store"});
+    if (!res.ok) throw new Error("HTTP "+res.status);
+    const w=await res.json();
+    const temp=Math.round(w?.current?.temperature_2m);
+    const feels=Math.round(w?.current?.apparent_temperature);
+    const code=w?.current?.weather_code;
+    const wind=Math.round(w?.current?.wind_speed_10m);
+    const uv=Math.round(w?.current?.uv_index);
+    const g=id=>document.getElementById(id);
 
     if (!isNaN(temp)) {
-      document.getElementById("w-temp").innerHTML = temp + "<sup>°</sup>";
-      document.getElementById("w-cond").textContent = WMO[code] || "—";
-      document.getElementById("w-icon").innerHTML = WMO_ICON[code] || ICON_SUN;
-      if (!isNaN(hi) && !isNaN(lo))
-        document.getElementById("w-range").textContent = `H ${hi}°  ·  L ${lo}°`;
-      const extra = [];
-      if (rainTxt) extra.push(rainTxt);
-      if (!isNaN(wind)) extra.push(`Wind ${wind} km/h`);
-      document.getElementById("w-extra").textContent = extra.join("  ·  ");
+      g('wx-temp').textContent=temp+'°';
+      g('wx-feels').textContent=!isNaN(feels)&&feels!==temp?'Feels '+feels+'°':'';
+      g('wx-desc').textContent=WMO[code]||'—';
+      g('wx-icon').innerHTML=WMO_ICON[code]||I_SUN;
 
-      const uvEl = document.getElementById("w-uv");
+      // rain forecast
+      let rainTxt='';
+      const times=w?.hourly?.time, probs=w?.hourly?.precipitation_probability;
+      if (times&&probs) {
+        const now=new Date(); let best=-1,bestIdx=-1;
+        for (let i=0;i<times.length;i++) {
+          if (new Date(times[i])<now) continue;
+          if (probs[i]>best) { best=probs[i]; bestIdx=i; }
+        }
+        if (bestIdx>=0&&best>0) {
+          const hr=new Date(times[bestIdx]).toLocaleTimeString("en-US",{hour:"numeric",hour12:true,timeZone:"America/New_York"});
+          rainTxt=`RAIN ${best}% AT ${hr}`;
+        }
+      }
+      const sub=[];
+      if (rainTxt) sub.push(rainTxt);
+      if (!isNaN(wind)) sub.push(`WIND ${wind} KM/H`);
+      g('wx-sub').textContent=sub.join(' · ');
+
+      // UV pill
+      const uvEl=g('wx-uv');
       if (!isNaN(uv)) {
-        const c = uvColor(uv);
-        uvEl.textContent = `UV ${uv} · ${uvLevel(uv)}`;
-        uvEl.style.color = `rgb(${c})`;
-        uvEl.style.background = `rgba(${c},.15)`;
-        uvEl.hidden = false;
-      } else {
-        uvEl.hidden = true;
-      }
-
-      // Late at night, also show tomorrow's forecast.
-      const tomorrowEl = document.getElementById("w-tomorrow");
-      const tomCode = w?.daily?.weather_code?.[1];
-      const tomHi = Math.round(w?.daily?.temperature_2m_max?.[1]);
-      const tomLo = Math.round(w?.daily?.temperature_2m_min?.[1]);
-      if (new Date().getHours() >= CONFIG.WEATHER_TOMORROW_HOUR
-          && !isNaN(tomHi) && !isNaN(tomLo)) {
-        document.getElementById("w-tom-icon").innerHTML = WMO_ICON[tomCode] || ICON_SUN;
-        document.getElementById("w-tom-text").innerHTML =
-          `Tomorrow: ${WMO[tomCode] || "—"}, <b>H ${tomHi}°</b> · L ${tomLo}°`;
-        tomorrowEl.hidden = false;
-      } else {
-        tomorrowEl.hidden = true;
-      }
+        const c=uvColor(uv);
+        uvEl.textContent=`UV ${uv} ${uvLevel(uv).toUpperCase()}`;
+        uvEl.style.color=`rgb(${c})`;
+        uvEl.style.borderColor=`rgba(${c},.5)`;
+        uvEl.style.background=`rgba(${c},.12)`;
+        uvEl.hidden=false;
+      } else { uvEl.hidden=true; }
     }
-  } catch(e) { console.warn("weather failed:", e.message); }
+
+    // Hourly strip (next 7 hours)
+    const hTimes=w?.hourly?.time, hTemps=w?.hourly?.temperature_2m, hCodes=w?.hourly?.weather_code;
+    if (hTimes&&hTemps&&hCodes) {
+      const now=new Date(), cells=[];
+      for (let i=0;i<hTimes.length&&cells.length<7;i++) {
+        const t=new Date(hTimes[i]); if (t<=now) continue;
+        const h=t.getHours(), ap=h>=12?'P':'A', h12=h%12||12;
+        cells.push({lbl:h12+ap, temp:Math.round(hTemps[i]), code:hCodes[i]});
+      }
+      g('hourly-cells').innerHTML=cells.map(c=>
+        `<div class="hourly-cell">`+
+        `<span class="hourly-hr">${c.lbl}</span>`+
+        `<span class="hourly-icon">${WMO_ICON[c.code]||I_SUN}</span>`+
+        `<span class="hourly-temp">${c.temp}°</span>`+
+        `</div>`
+      ).join('');
+    }
+
+    // Forecast (3 days)
+    const daily=w?.daily;
+    if (daily?.temperature_2m_max) {
+      const today=new Date();
+      const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+      const labels=['TODAY','TMRW',DAYS[(today.getDay()+2)%7]];
+      g('forecast-rows').innerHTML=labels.map((lbl,i)=>{
+        const hi=Math.round(daily.temperature_2m_max[i]);
+        const lo=Math.round(daily.temperature_2m_min[i]);
+        const fc=daily.weather_code[i];
+        const color=i===0?'#cfd2d0':'#9a9f9f';
+        return `<div class="fc-row">`+
+          `<span class="fc-day" style="color:${color}">${lbl}</span>`+
+          `<span class="fc-icon">${WMO_ICON[fc]||I_SUN}</span>`+
+          `<span class="fc-lo">${lo}°</span>`+
+          `<div class="fc-bar"></div>`+
+          `<span class="fc-hi">${hi}°</span>`+
+          `</div>`;
+      }).join('');
+    }
+
+    // Sun arc
+    if (daily?.sunrise?.[0]) updateSunArc(daily.sunrise[0], daily.sunset[0]);
+
+  } catch(e) { console.warn("weather failed:",e.message); }
 }
 
-/* ── BIKES (Citi Bike GBFS — no key, CORS-friendly) ─────────────── */
+/* ── BIKES (Citi Bike GBFS) ──────────────────────────────────────── */
 async function loadBikes() {
   try {
-    const [infoRes, stRes] = await Promise.all([
-      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_information.json", { cache:"no-store" }),
-      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_status.json",      { cache:"no-store" }),
+    const [infoRes,stRes]=await Promise.all([
+      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_information.json",{cache:"no-store"}),
+      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_status.json",{cache:"no-store"}),
     ]);
-    if (!infoRes.ok || !stRes.ok) throw new Error("HTTP " + infoRes.status);
-    const [info, st] = await Promise.all([infoRes.json(), stRes.json()]);
-
-    const infoMap = {};
-    for (const s of (info.data?.stations || [])) infoMap[s.station_id] = s;
-    const stMap = {};
-    for (const s of (st.data?.stations || [])) stMap[s.station_id] = s;
-
-    CONFIG.BIKE_ANCHORS.forEach((a, i) => {
-      let total = 0;
-      for (const [id, s] of Object.entries(infoMap)) {
-        if (haversineKm(a.lat, a.lon, s.lat, s.lon) > a.radius) continue;
-        const status = stMap[id];
+    if (!infoRes.ok||!stRes.ok) throw new Error("HTTP "+infoRes.status);
+    const [info,st]=await Promise.all([infoRes.json(),stRes.json()]);
+    const infoMap={};
+    for (const s of (info.data?.stations||[])) infoMap[s.station_id]=s;
+    const stMap={};
+    for (const s of (st.data?.stations||[])) stMap[s.station_id]=s;
+    CONFIG.BIKE_ANCHORS.forEach((a,i)=>{
+      let total=0;
+      for (const [id,s] of Object.entries(infoMap)) {
+        if (haversineKm(a.lat,a.lon,s.lat,s.lon)>a.radius) continue;
+        const status=stMap[id];
         if (!status?.is_installed) continue;
-        if (a.role === "bikes" && status.is_renting)
-          total += (status.num_bikes_available ?? 0);
-        if (a.role === "docks" && status.is_returning)
-          total += (status.num_docks_available ?? 0);
+        if (a.role==="bikes"&&status.is_renting) total+=(status.num_bikes_available??0);
+        if (a.role==="docks"&&status.is_returning) total+=(status.num_docks_available??0);
       }
-      const el = document.getElementById("bk-" + i);
-      if (el) { el.textContent = total; el.classList.toggle("zero", total === 0); }
+      const el=document.getElementById("bk-"+i);
+      if (el) { el.textContent=total; el.classList.toggle("zero",total===0); }
     });
-  } catch(e) { console.warn("bikes failed:", e.message); }
+  } catch(e) { console.warn("bikes failed:",e.message); }
 }
 
-/* ── RENDER ─────────────────────────────────────────────────────── */
+/* ── RENDER ──────────────────────────────────────────────────────── */
 function render() {
-  const now = Date.now();
-  const d = new Date();
+  const now=Date.now();
+  const d=new Date();
+  const g=id=>document.getElementById(id);
 
-  // time tile
-  const hm = d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})
-              .replace(/\s[AP]M$/i,"");
-  const apm = d.getHours() >= 12 ? "PM" : "AM";
-  document.getElementById("t-hm").textContent = hm;
-  document.getElementById("t-sec").textContent =
-    ":" + String(d.getSeconds()).padStart(2,"0") + " " + apm;
-  document.getElementById("t-date").textContent =
-    d.toLocaleDateString("en-US",{weekday:"short", month:"short", day:"numeric"});
+  // Clock
+  let h=d.getHours();
+  const ap=h>=12?'PM':'AM'; h=h%12||12;
+  const mm=String(d.getMinutes()).padStart(2,'0');
+  const ss=String(d.getSeconds()).padStart(2,'0');
+  const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const MONS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  g('clk-hm').textContent=h+':'+mm;
+  g('clk-sec').textContent=':'+ss;
+  g('clk-date').textContent=DAYS[d.getDay()]+' · '+MONS[d.getMonth()]+' '+d.getDate();
+  g('clk-ampm').textContent=ap;
 
-  // service-state line
-  const collapsed = isCollapsedSchedule(d);
-  const hw = serviceHeadwayMin(d);
-  const statusEl = document.getElementById("t-status");
-  let status = collapsed ? "Overnight · via Hoboken" : "Full service";
-  if (hw) status += ` · ~${hw} min`;
-  statusEl.textContent = status;
-  statusEl.classList.toggle("collapsed", collapsed);
-  statusEl.hidden = false;
+  // Service status
+  const collapsed=isCollapsedSchedule(d);
+  const hw=serviceHeadwayMin(d);
+  let status=collapsed?'OVERNIGHT · VIA HOB':'FULL SERVICE';
+  if (hw) status+=' · ~'+hw+' MIN';
+  g('svc-txt').textContent=status;
+  g('svc-pill').classList.toggle('collapsed',collapsed);
 
-  // train tiles
-  CONFIG.TILES.forEach((tile, i) => {
+  // Train tiles
+  CONFIG.TILES.forEach((tile,i)=>{
     if (tile.hidden) return;
-    const el = document.getElementById("tile" + i);
+    const tileEl=g('tile'+i);
+    if (!tileEl) return;
 
-    // Live, real-time arrivals from the PATH feed (most accurate).
-    const live = trains
-      .map(t => ({...t, mins: Math.round((t.arrival - now)/60000)}))
-      .filter(t => t.destIdx === i && t.mins >= 0)
-      .sort((a,b) => a.mins - b.mins);
+    const live=trains
+      .map(t=>({...t,mins:Math.round((t.arrival-now)/60000)}))
+      .filter(t=>t.destIdx===i&&t.mins>=0)
+      .sort((a,b)=>a.mins-b.mins);
 
-    // Blend: live arrivals first, then real scheduled departures from the
-    // embedded timetable to fill out the next DEPARTURES_SHOWN — and to carry
-    // the tile entirely when the feed is quiet (e.g. overnight gaps).
-    const blended = live.slice(0, CONFIG.DEPARTURES_SHOWN).map(t => ({
-      arrival:t.arrival, mins:t.mins, viaHoboken:t.viaHoboken, scheduled:false
+    const blended=live.slice(0,CONFIG.DEPARTURES_SHOWN).map(t=>({
+      arrival:t.arrival,mins:t.mins,viaHoboken:t.viaHoboken,scheduled:false
     }));
-    // Fill out to DEPARTURES_SHOWN. Live arrivals are real; anything after is
-    // projected by the *current headway* anchored on the last real departure.
-    // (Live feed and timetable don't share a clock grid, so using raw timetable
-    // times produces near-duplicate first gaps — e.g. live 8 min + scheduled
-    // 11 min for the same train. Spacing by headway keeps it regular: 8·18·28.)
-    if (tile.sched && blended.length < CONFIG.DEPARTURES_SHOWN) {
-      const collapsed = isCollapsedSchedule(d);
-      const viaHob = (tile.sched === "33" || tile.sched === "JSQ") && collapsed;
 
-      // No live train at all → seed with the next real scheduled time, but only
-      // if it's within the lookahead window (otherwise leave the tile empty so
-      // the empty state shows "Next ~…" instead of a far-off projection).
+    if (tile.sched&&blended.length<CONFIG.DEPARTURES_SHOWN) {
+      const viaHob=(tile.sched==="33"||tile.sched==="JSQ")&&collapsed;
       if (!blended.length) {
-        const seed = scheduledDepartures(tile.sched, d, d, 1)[0];
-        if (seed && (seed - now) <= CONFIG.MAX_LOOKAHEAD_MINUTES * 60000)
-          blended.push({ arrival:seed, mins:Math.round((seed - now)/60000),
-            viaHoboken:viaHob, scheduled:true });
+        const seed=scheduledDepartures(tile.sched,d,d,1)[0];
+        if (seed&&(seed-now)<=CONFIG.MAX_LOOKAHEAD_MINUTES*60000)
+          blended.push({arrival:seed,mins:Math.round((seed-now)/60000),viaHoboken:viaHob,scheduled:true});
       }
-
-      // Headway: prefer the gap actually observed between two live trains; else
-      // the line's current scheduled headway; else a sane default.
-      let H = lineHeadwayMin(tile.sched, d);
-      if (live.length >= 2) {
-        const g = Math.round((live[live.length-1].arrival - live[live.length-2].arrival) / 60000);
-        if (g >= 3) H = g;
+      let H=lineHeadwayMin(tile.sched,d);
+      if (live.length>=2) {
+        const g2=Math.round((live[live.length-1].arrival-live[live.length-2].arrival)/60000);
+        if (g2>=3) H=g2;
       }
-      if (!H || H <= 0) H = CONFIG.FALLBACK_HEADWAY_MINUTES;
-
-      while (blended.length && blended.length < CONFIG.DEPARTURES_SHOWN) {
-        const last = blended[blended.length-1];
-        const arrival = new Date(last.arrival.getTime() + H * 60000);
-        if ((arrival - now) > CONFIG.MAX_LOOKAHEAD_MINUTES * 60000) break;
-        blended.push({ arrival, mins:Math.round((arrival - now)/60000),
-          viaHoboken:viaHob, scheduled:true });
+      if (!H||H<=0) H=CONFIG.FALLBACK_HEADWAY_MINUTES;
+      while (blended.length&&blended.length<CONFIG.DEPARTURES_SHOWN) {
+        const last=blended[blended.length-1];
+        const arrival=new Date(last.arrival.getTime()+H*60000);
+        if ((arrival-now)>CONFIG.MAX_LOOKAHEAD_MINUTES*60000) break;
+        blended.push({arrival,mins:Math.round((arrival-now)/60000),viaHoboken:viaHob,scheduled:true});
       }
     }
 
-    const minsEl = el.querySelector(".mins");
-    const unitEl = el.querySelector(".unit");
-    const thenEl = el.querySelector(".then");
-    const viaEl = el.querySelector(".via");
+    const flapNumEl=g('fn-'+i);
+    const flapBoxEl=tileEl.querySelector('.flap-box');
+    const badgeEl=g('badge-'+i);
+    const thenEl=g('then-'+i);
+
+    // via Hoboken sub-label on 33 St tile
+    if (i===1) {
+      const subEl=g('sub-1');
+      if (subEl) {
+        const viaHob=collapsed||blended.some(t=>t.viaHoboken);
+        subEl.textContent='33RD STREET'+(viaHob?' · via HOBOKEN':'');
+      }
+    }
 
     if (!blended.length) {
-      el.classList.add("empty");
-      minsEl.textContent = "—"; minsEl.className = "mins"; minsEl.dataset.val = "";
-      unitEl.textContent = ""; viaEl.hidden = true;
-      const hint = nextServiceLabel(tile.sched, d);
-      thenEl.innerHTML = hint ? `<span class="eta">${hint}</span>` : "";
+      const hint=nextServiceLabel(tile.sched,d);
+      const prev=flapNumEl.dataset.val;
+      if (prev!=='—') {
+        flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
+        flapNumEl.classList.add('flip'); flapNumEl.dataset.val='—';
+      }
+      flapNumEl.textContent='—'; flapBoxEl.classList.remove('urgent');
+      badgeEl.className='tile-badge badge-scheduled'; badgeEl.textContent='NO SVC';
+      thenEl.textContent=hint||'—';
       return;
     }
-    el.classList.remove("empty");
 
-    const first = blended[0];
-    viaEl.hidden = !first.viaHoboken;
-    let val, due = false;
-    if (first.mins <= 0) {
-      val = "Due"; due = true; unitEl.textContent = "";
-    } else {
-      val = String(first.mins); unitEl.textContent = "min";
+    const first=blended[0];
+    const val=first.mins<=0?'NOW':String(first.mins);
+    if (flapNumEl.dataset.val!==val) {
+      flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
+      flapNumEl.classList.add('flip'); flapNumEl.dataset.val=val;
     }
-    const changed = minsEl.dataset.val !== undefined && minsEl.dataset.val !== val;
-    minsEl.className = "mins" + (due ? " due pulse" : "")
-      + (changed && !first.scheduled ? " flip" : "");
-    minsEl.dataset.val = val;
-    minsEl.textContent = val;
-    minsEl.style.opacity = (!due && first.mins < CONFIG.WALK_MINUTES) ? ".55" : "";
+    flapNumEl.textContent=val;
+    flapBoxEl.classList.toggle('urgent',first.mins<=3&&first.mins>=0);
 
-    const eta = first.arrival.toLocaleTimeString("en-US",
-      { hour:"numeric", minute:"2-digit", hour12:true });
+    if (first.mins<=3) {
+      badgeEl.className='tile-badge badge-boarding'; badgeEl.textContent='BOARDING';
+    } else if (!first.scheduled) {
+      badgeEl.className='tile-badge badge-live'; badgeEl.textContent='LIVE';
+    } else {
+      badgeEl.className='tile-badge badge-scheduled'; badgeEl.textContent='SCHEDULED';
+    }
 
-    const more = blended.slice(1, CONFIG.DEPARTURES_SHOWN).map(t => {
-      const txt = (t.mins <= 0 ? "Due" : t.mins + " min") + (t.scheduled ? "*" : "");
-      const cls = [t.mins < CONFIG.WALK_MINUTES ? "miss" : "", t.scheduled ? "sched" : ""]
-        .filter(Boolean).join(" ");
-      return `<span class="${cls}">${txt}</span>`;
-    });
-    thenEl.innerHTML = [`<span class="eta${first.scheduled ? " sched" : ""}">${eta}${first.scheduled ? "*" : ""}</span>`, ...more]
-      .join('<span class="dot">·</span>');
+    const more=blended.slice(1,3);
+    thenEl.textContent=more.length?more.map(t=>t.mins<=0?'NOW':String(t.mins)).join(' · '):'—';
   });
 
-  // footer status
-  const stale = lastGood && (Date.now()-lastGood)/1000 > CONFIG.POLL_SECONDS * 3;
-  document.getElementById("app").classList.toggle("is-stale", !!stale);
-  const upd = document.getElementById("updated");
-  if (!lastGood) upd.textContent = "connecting…";
-  else if (stale) upd.textContent = "stale";
-  else upd.textContent = "live";
+  // Header live status
+  const stale=lastGood&&(Date.now()-lastGood)/1000>CONFIG.POLL_SECONDS*3;
+  document.getElementById('stage').classList.toggle('is-stale',!!stale);
+  const agoEl=g('hdr-ago');
+  if (agoEl) {
+    if (!lastGood) agoEl.textContent='CONNECTING…';
+    else if (stale) agoEl.textContent='STALE';
+    else { const sec=Math.round((Date.now()-lastGood)/1000); agoEl.textContent=sec+'s AGO'; }
+  }
 
   applyNight();
 }
 
-function toggleDemo(on) { document.getElementById("demoBadge").hidden = !on; }
+function toggleDemo(on) { document.getElementById("demoBadge").hidden=!on; }
 
 function applyNight() {
-  const h = new Date().getHours();
-  const {NIGHT_DIM_START:s, NIGHT_DIM_END:e} = CONFIG;
-  const night = s===e ? false : (s<e ? h>=s&&h<e : h>=s||h<e);
-  document.getElementById("night").style.opacity = night ? CONFIG.NIGHT_DIM_OPACITY : 0;
+  const h=new Date().getHours();
+  const {NIGHT_DIM_START:s,NIGHT_DIM_END:e}=CONFIG;
+  const night=s===e?false:(s<e?h>=s&&h<e:h>=s||h<e);
+  document.getElementById("night").style.opacity=night?CONFIG.NIGHT_DIM_OPACITY:0;
 }
 
-/* ── KEEP AWAKE ─────────────────────────────────────────────────── */
-async function keepAwake() {
-  try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {}
-}
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") { keepAwake(); load(); loadWeather(); loadBikes(); }
-});
-
-/* ── DEMO ───────────────────────────────────────────────────────── */
+/* ── DEMO ────────────────────────────────────────────────────────── */
 function demo() {
-  const m = n => new Date(Date.now()+n*60000);
+  const m=n=>new Date(Date.now()+n*60000);
   return [
-    {destIdx:0,arrival:m(4)}, {destIdx:0,arrival:m(11)},{destIdx:0,arrival:m(19)},
-    {destIdx:1,arrival:m(2)}, {destIdx:1,arrival:m(9)}, {destIdx:1,arrival:m(17)},
-    {destIdx:2,arrival:m(0)}, {destIdx:2,arrival:m(14)},{destIdx:2,arrival:m(24)},
-    {destIdx:3,arrival:m(7)}, {destIdx:3,arrival:m(18)},
+    {destIdx:0,arrival:m(4)},{destIdx:0,arrival:m(11)},{destIdx:0,arrival:m(19)},
+    {destIdx:1,arrival:m(2)},{destIdx:1,arrival:m(9)},{destIdx:1,arrival:m(17)},
+    {destIdx:2,arrival:m(0)},{destIdx:2,arrival:m(14)},{destIdx:2,arrival:m(24)},
+    {destIdx:3,arrival:m(7)},{destIdx:3,arrival:m(18)},
   ];
 }
 
-/* ── PWA ────────────────────────────────────────────────────────── */
-const manifest = {name:"Newport PATH",short_name:"Newport PATH",display:"fullscreen",
-  orientation:"any",background_color:"#040810",theme_color:"#040810",start_url:"."};
-const ml = document.createElement("link");
-ml.rel = "manifest";
-ml.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/json"}));
+/* ── KEEP AWAKE + PWA ────────────────────────────────────────────── */
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch(e) {}
+}
+document.addEventListener("visibilitychange",()=>{
+  if (document.visibilityState==="visible") { keepAwake(); load(); loadWeather(); loadBikes(); }
+});
+
+const manifest={name:"Newport PATH",short_name:"Newport PATH",display:"fullscreen",
+  orientation:"any",background_color:"#0a0b0c",theme_color:"#0a0b0c",start_url:"."};
+const ml=document.createElement("link");
+ml.rel="manifest";
+ml.href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/json"}));
 document.head.appendChild(ml);
 
 keepAwake(); load(); loadWeather(); loadBikes(); render();
-setInterval(render, 1000);
-setInterval(load, CONFIG.POLL_SECONDS * 1000);
-setInterval(loadWeather, CONFIG.WEATHER_MINUTES * 60 * 1000);
-setInterval(loadBikes,  CONFIG.BIKE_MINUTES  * 60 * 1000);
+setInterval(render,1000);
+setInterval(load,CONFIG.POLL_SECONDS*1000);
+setInterval(loadWeather,CONFIG.WEATHER_MINUTES*60*1000);
+setInterval(loadBikes,CONFIG.BIKE_MINUTES*60*1000);
 </script>
 </body>
 </html>
