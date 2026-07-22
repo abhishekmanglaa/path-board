@@ -4,3 +4,10 @@
 # Local schedule deliverables / scrape artifacts — not part of the deployed app
 *.xlsx
 *.model.json
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
