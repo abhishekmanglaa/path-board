@@ -69,34 +69,36 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 #tile1 .t-sub{color:#6b6a4a}
 
 /* Big floating digit */
-.flap-wrap{flex:1;display:flex;align-items:center;gap:8px;min-height:0}
+.flap-wrap{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:0}
 .flap-wrap.at-platform{flex-direction:column;justify-content:center;gap:18px}
 .flap-num{
   font-family:'Barlow Condensed';font-weight:700;
-  font-size:340px;line-height:.72;user-select:none;
+  font-size:300px;line-height:.72;user-select:none;
 }
 #tile0 .flap-num{color:#fff}
 #tile1 .flap-num{color:#FFC72C}
 .flap-num.flip{animation:flapIn .45s ease}
 .flap-num.urgent{animation:urgentPulse 1.4s ease infinite}
 .flap-num.at-platform{font-size:170px;line-height:.85;letter-spacing:.01em;text-align:center;max-width:100%}
+#tile0 .flap-num.at-platform{color:#7ed320}
 .flap-aside{display:flex;flex-direction:column;gap:12px;align-self:center;padding-bottom:20px}
 .flap-aside.at-platform{flex-direction:row;align-items:center;gap:12px;padding-bottom:0}
 .flap-unit{font-family:'Barlow Condensed';font-weight:500;font-size:34px;letter-spacing:.03em;line-height:1}
 #tile0 .flap-unit{color:#9a9f9f}
 #tile1 .flap-unit{color:#b89a3a}
 
-.then-row{display:flex;align-items:center;gap:16px;padding-top:15px}
+.then-row{display:flex;flex-direction:column;gap:10px;padding-top:14px}
 #tile0 .then-row{border-top:1px solid #1c1e20}
 #tile1 .then-row{border-top:1px solid #2a2508}
-.tile-badge{font-size:16px;letter-spacing:.1em;padding:8px 15px;border-radius:100px;white-space:nowrap}
+.then-row-top{display:flex;align-items:center;gap:14px}
+.tile-badge{font-size:15px;letter-spacing:.1em;padding:7px 14px;border-radius:100px;white-space:nowrap}
 .badge-scheduled{color:#7ed320;background:rgba(101,193,0,.13)}
 .badge-boarding {color:#FFC72C;background:rgba(255,199,44,.13)}
 .badge-live     {color:#9a9f9f;background:rgba(154,159,159,.12)}
 .then-label{font-size:14px;letter-spacing:.14em;flex-shrink:0}
 #tile0 .then-label{color:#5a5f62}
 #tile1 .then-label{color:#6b6a4a}
-.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:52px;letter-spacing:.04em;line-height:1;white-space:nowrap}
+.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:84px;letter-spacing:.02em;line-height:.9;white-space:nowrap}
 #tile0 .then-times{color:#c9ccc8}
 #tile1 .then-times{color:#d8c579}
 
@@ -108,7 +110,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 .time-sec{flex:1;border-bottom:1px solid #1c1e20;padding:24px 28px;display:flex;flex-direction:column;min-height:0}
 .clk-wrap{flex:1;display:flex;flex-direction:column;justify-content:center}
 .clk-row{display:flex;align-items:baseline;gap:8px}
-.clk-hm{font-family:'Barlow Condensed';font-weight:600;font-size:180px;line-height:.78;color:#eceae6}
+.clk-hm{font-family:'Barlow Condensed';font-weight:600;font-size:196px;line-height:.78;color:#eceae6}
 .clk-sec{font-family:'Barlow Condensed';font-weight:500;font-size:46px;color:#7ed320}
 .clk-date{font-size:20px;letter-spacing:.18em;color:#9a9f9f;margin-top:10px}
 
@@ -125,7 +127,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 .wx-main{display:flex;align-items:center;gap:16px}
 .wx-icon{width:74px;height:74px;flex-shrink:0}
 .wx-icon svg{width:100%;height:100%;display:block;stroke:#cfd2d0}
-.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:138px;line-height:.78;color:#eceae6}
+.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:154px;line-height:.78;color:#eceae6}
 .wx-cond{font-size:21px;color:#cfd2d0;margin-top:8px}
 .wx-lo{color:#8a8f8f}
 
@@ -208,8 +210,10 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
         </div>
       </div>
       <div class="then-row">
-        <span class="tile-badge badge-scheduled" id="badge-0">—</span>
-        <span class="then-label">THEN</span>
+        <div class="then-row-top">
+          <span class="tile-badge badge-scheduled" id="badge-0">—</span>
+          <span class="then-label">THEN</span>
+        </div>
         <span class="then-times" id="then-0">—</span>
       </div>
     </div>
@@ -230,8 +234,10 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
         </div>
       </div>
       <div class="then-row">
-        <span class="tile-badge badge-scheduled" id="badge-1">—</span>
-        <span class="then-label">THEN</span>
+        <div class="then-row-top">
+          <span class="tile-badge badge-scheduled" id="badge-1">—</span>
+          <span class="then-label">THEN</span>
+        </div>
         <span class="then-times" id="then-1">—</span>
       </div>
     </div>
