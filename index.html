@@ -70,24 +70,20 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 
 /* Big floating digit */
 .flap-wrap{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:0}
-.flap-wrap.at-platform{flex-direction:column;justify-content:center;gap:18px}
 .flap-num{
   font-family:'Barlow Condensed';font-weight:700;
-  font-size:300px;line-height:.72;user-select:none;
+  font-size:260px;line-height:.72;user-select:none;
 }
 #tile0 .flap-num{color:#fff}
 #tile1 .flap-num{color:#FFC72C}
 .flap-num.flip{animation:flapIn .45s ease}
 .flap-num.urgent{animation:urgentPulse 1.4s ease infinite}
-.flap-num.at-platform{font-size:170px;line-height:.85;letter-spacing:.01em;text-align:center;max-width:100%}
-#tile0 .flap-num.at-platform{color:#7ed320}
 .flap-aside{display:flex;flex-direction:column;gap:12px;align-self:center;padding-bottom:20px}
-.flap-aside.at-platform{flex-direction:row;align-items:center;gap:12px;padding-bottom:0}
 .flap-unit{font-family:'Barlow Condensed';font-weight:500;font-size:34px;letter-spacing:.03em;line-height:1}
 #tile0 .flap-unit{color:#9a9f9f}
 #tile1 .flap-unit{color:#b89a3a}
 
-.then-row{display:flex;flex-direction:column;gap:10px;padding-top:14px}
+.then-row{display:flex;flex-direction:column;gap:10px;padding-top:14px;flex-shrink:0}
 #tile0 .then-row{border-top:1px solid #1c1e20}
 #tile1 .then-row{border-top:1px solid #2a2508}
 .then-row-top{display:flex;align-items:center;gap:14px}
@@ -98,7 +94,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 .then-label{font-size:14px;letter-spacing:.14em;flex-shrink:0}
 #tile0 .then-label{color:#5a5f62}
 #tile1 .then-label{color:#6b6a4a}
-.then-times{font-family:'Barlow Condensed';font-weight:600;font-size:84px;letter-spacing:.02em;line-height:.9;white-space:nowrap}
+.then-times{font-family:'Barlow Condensed';font-weight:700;font-size:112px;letter-spacing:.01em;line-height:.85;white-space:nowrap}
 #tile0 .then-times{color:#c9ccc8}
 #tile1 .then-times{color:#d8c579}
 
@@ -658,9 +654,6 @@ function render() {
     }
 
     const flapNumEl=g('fn-'+i);
-    const flapWrapEl=tileEl.querySelector('.flap-wrap');
-    const flapAsideEl=tileEl.querySelector('.flap-aside');
-    const flapUnitEl=tileEl.querySelector('.flap-unit');
     const badgeEl=g('badge-'+i);
     const thenEl=g('then-'+i);
 
@@ -680,27 +673,20 @@ function render() {
         flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
         flapNumEl.classList.add('flip'); flapNumEl.dataset.val='—';
       }
-      flapNumEl.textContent='—'; flapNumEl.classList.remove('urgent','at-platform');
-      flapWrapEl.classList.remove('at-platform'); flapAsideEl.classList.remove('at-platform');
-      flapUnitEl.textContent='minutes';
+      flapNumEl.textContent='—'; flapNumEl.classList.remove('urgent');
       badgeEl.className='tile-badge badge-scheduled'; badgeEl.textContent='NO SVC';
       thenEl.textContent=hint||'—';
       return;
     }
 
     const first=blended[0];
-    const arrived=first.mins<=0;
-    const val=arrived?'NOW':String(first.mins);
+    const val=String(Math.max(0,first.mins));
     if (flapNumEl.dataset.val!==val) {
       flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
       flapNumEl.classList.add('flip'); flapNumEl.dataset.val=val;
     }
     flapNumEl.textContent=val;
     flapNumEl.classList.toggle('urgent',first.mins<=3&&first.mins>=0);
-    flapNumEl.classList.toggle('at-platform',arrived);
-    flapWrapEl.classList.toggle('at-platform',arrived);
-    flapAsideEl.classList.toggle('at-platform',arrived);
-    flapUnitEl.textContent=arrived?'at the platform':'minutes';
 
     if (first.mins<=3) {
       badgeEl.className='tile-badge badge-boarding'; badgeEl.textContent='BOARDING';
