@@ -301,6 +301,7 @@ window.addEventListener('orientationchange', fitStage);
 const CONFIG = {
   API_BASE:        "https://path.abhishekmangla59.workers.dev",
   POLL_SECONDS:    60,
+  FETCH_TIMEOUT_MS: 12000,
   WALK_MINUTES:    6,
   NIGHT_DIM_START: 23,
   NIGHT_DIM_END:   6,
@@ -409,12 +410,23 @@ CONFIG.BIKE_ANCHORS.forEach((a,i)=>{
 });
 statBar.insertAdjacentHTML("beforeend",`<span id="stat-attribution">PORT AUTHORITY NY NJ</span>`);
 
+/* ── FETCH WITH TIMEOUT ──────────────────────────────────────────── */
+// Plain fetch() has no built-in timeout — a stalled connection just hangs, and on
+// this kiosk's always-on wifi a hang is indistinguishable from a real outage until
+// something aborts it. Without this, a single stuck request never rejects, so the
+// catch-block fallback (demo data / last-known weather / last-known bikes) never runs.
+function fetchWithTimeout(url, opts={}) {
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),CONFIG.FETCH_TIMEOUT_MS);
+  return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(timer));
+}
+
 /* ── FETCH TRAINS ────────────────────────────────────────────────── */
 let trains=[], lastGood=0, usingDemo=false;
 
 async function load() {
   try {
-    const res=await fetch(CONFIG.API_BASE,{cache:"no-store"});
+    const res=await fetchWithTimeout(CONFIG.API_BASE,{cache:"no-store"});
     if (!res.ok) throw new Error("HTTP "+res.status);
     const data=await res.json();
     if (!lastGood&&!usingDemo) console.log("PATH feed:",data);
@@ -522,7 +534,7 @@ async function loadWeather() {
       +`&hourly=temperature_2m,weather_code,precipitation_probability`
       +`&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset`
       +`&timezone=America%2FNew_York&forecast_days=4`;
-    const res=await fetch(url,{cache:"no-store"});
+    const res=await fetchWithTimeout(url,{cache:"no-store"});
     if (!res.ok) throw new Error("HTTP "+res.status);
     const w=await res.json();
     const temp=Math.round(w?.current?.temperature_2m);
@@ -568,8 +580,8 @@ async function loadWeather() {
 async function loadBikes() {
   try {
     const [infoRes,stRes]=await Promise.all([
-      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_information.json",{cache:"no-store"}),
-      fetch("https://gbfs.citibikenyc.com/gbfs/en/station_status.json",{cache:"no-store"}),
+      fetchWithTimeout("https://gbfs.citibikenyc.com/gbfs/en/station_information.json",{cache:"no-store"}),
+      fetchWithTimeout("https://gbfs.citibikenyc.com/gbfs/en/station_status.json",{cache:"no-store"}),
     ]);
     if (!infoRes.ok||!stRes.ok) throw new Error("HTTP "+infoRes.status);
     const [info,st]=await Promise.all([infoRes.json(),stRes.json()]);
