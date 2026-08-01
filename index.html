@@ -264,7 +264,6 @@ const CONFIG = {
   NIGHT_DIM_OPACITY: 0.35,
   DEPARTURES_SHOWN: 3,
   MAX_LOOKAHEAD_MINUTES: 120,
-  FALLBACK_HEADWAY_MINUTES: 20,
   LAT: 40.7270, LON: -74.0335,
   WEATHER_MINUTES: 10,
   TILES: [
@@ -302,6 +301,20 @@ function scheduledDepartures(schedKey, now, after, limit) {
     if (out.length>=limit) break;
   }
   return out;
+}
+
+/**
+ * The scheduled minute-of-day closest to `targetDate`, as a Date on the same
+ * day. Used to find which timetable slot a live arrival actually corresponds
+ * to, so we can measure how far ahead/behind schedule that train is running.
+ */
+function nearestScheduledTime(schedKey, targetDate) {
+  const arr=SCHED[dayType(targetDate)][schedKey]||[];
+  if (!arr.length) return null;
+  const targetMin=(targetDate-startOfDay(targetDate))/60000;
+  let best=arr[0];
+  for (const m of arr) if (Math.abs(m-targetMin)<Math.abs(best-targetMin)) best=m;
+  return minutesToDate(targetDate,best);
 }
 
 function nextServiceLabel(schedKey, d) {
@@ -550,15 +563,20 @@ function render() {
         if (seed&&(seed-now)<=CONFIG.MAX_LOOKAHEAD_MINUTES*60000)
           blended.push({arrival:seed,mins:Math.round((seed-now)/60000),viaHoboken:viaHob,scheduled:true});
       }
-      let H=lineHeadwayMin(tile.sched,d);
-      if (live.length>=2) {
-        const g2=Math.round((live[live.length-1].arrival-live[live.length-2].arrival)/60000);
-        if (g2>=3) H=g2;
-      }
-      if (!H||H<=0) H=CONFIG.FALLBACK_HEADWAY_MINUTES;
+      // Fill remaining slots from the actual timetable rather than an averaged
+      // headway: match the last known arrival to its nearest scheduled slot,
+      // measure how far ahead/behind that slot real service is running, then
+      // carry the same offset onto the REAL next scheduled times (whatever
+      // their actual, often uneven, spacing is) instead of spacing new ones
+      // out evenly.
       while (blended.length&&blended.length<CONFIG.DEPARTURES_SHOWN) {
-        const last=blended[blended.length-1];
-        const arrival=new Date(last.arrival.getTime()+H*60000);
+        const anchor=blended[blended.length-1];
+        const nearest=nearestScheduledTime(tile.sched,anchor.arrival);
+        if (!nearest) break;
+        const delta=anchor.arrival.getTime()-nearest.getTime();
+        const nextReal=scheduledDepartures(tile.sched,anchor.arrival,nearest,1)[0];
+        if (!nextReal) break;
+        const arrival=new Date(nextReal.getTime()+delta);
         if ((arrival-now)>CONFIG.MAX_LOOKAHEAD_MINUTES*60000) break;
         blended.push({arrival,mins:Math.round((arrival-now)/60000),viaHoboken:viaHob,scheduled:true});
       }
