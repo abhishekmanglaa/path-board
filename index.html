@@ -264,6 +264,7 @@ const CONFIG = {
   NIGHT_DIM_OPACITY: 0.35,
   DEPARTURES_SHOWN: 3,
   MAX_LOOKAHEAD_MINUTES: 120,
+  FALLBACK_HEADWAY_MINUTES: 20,
   LAT: 40.7270, LON: -74.0335,
   WEATHER_MINUTES: 10,
   TILES: [
@@ -568,15 +569,22 @@ function render() {
       // measure how far ahead/behind that slot real service is running, then
       // carry the same offset onto the REAL next scheduled times (whatever
       // their actual, often uneven, spacing is) instead of spacing new ones
-      // out evenly.
+      // out evenly. Some line/day combinations have no embedded schedule at
+      // all (e.g. WTC has no weekend entries even though it does run) -- in
+      // that case there's nothing to anchor to, so fall back to a flat
+      // headway guess rather than showing nothing.
       while (blended.length&&blended.length<CONFIG.DEPARTURES_SHOWN) {
         const anchor=blended[blended.length-1];
         const nearest=nearestScheduledTime(tile.sched,anchor.arrival);
-        if (!nearest) break;
-        const delta=anchor.arrival.getTime()-nearest.getTime();
-        const nextReal=scheduledDepartures(tile.sched,anchor.arrival,nearest,1)[0];
-        if (!nextReal) break;
-        const arrival=new Date(nextReal.getTime()+delta);
+        let arrival;
+        if (nearest) {
+          const delta=anchor.arrival.getTime()-nearest.getTime();
+          const nextReal=scheduledDepartures(tile.sched,anchor.arrival,nearest,1)[0];
+          if (!nextReal) break;
+          arrival=new Date(nextReal.getTime()+delta);
+        } else {
+          arrival=new Date(anchor.arrival.getTime()+CONFIG.FALLBACK_HEADWAY_MINUTES*60000);
+        }
         if ((arrival-now)>CONFIG.MAX_LOOKAHEAD_MINUTES*60000) break;
         blended.push({arrival,mins:Math.round((arrival-now)/60000),viaHoboken:viaHob,scheduled:true});
       }
