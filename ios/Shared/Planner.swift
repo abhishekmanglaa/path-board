@@ -43,6 +43,12 @@ struct Plan: Codable {
         return station.destinations.map { dest in (dest, trains.filter(dest.includes)) }
     }
 
+    /// The latest train that's still coming but you can no longer reach on foot —
+    /// what a "just missed" note should name when nothing is catchable.
+    func justMissed(at now: Date) -> Departure? {
+        departures.last { $0.date > now && leaveBy($0) < now }
+    }
+
     /// The moment you have to start walking to make `departure`.
     func leaveBy(_ departure: Departure) -> Date {
         departure.date.addingTimeInterval(-Double(walkMinutes) * 60)

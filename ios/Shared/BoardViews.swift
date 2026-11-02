@@ -42,10 +42,15 @@ struct BoardSnapshot {
     let station: Station
     let walkMinutes: Int
     let groups: [Group]
+    /// When nothing is catchable: the train you'd need to run for, if any.
+    let justMissed: Departure?
+    let minutesToMissed: Int
 
     init(plan: Plan, at date: Date) {
         station = plan.station
         walkMinutes = plan.walkMinutes
+        justMissed = plan.justMissed(at: date)
+        minutesToMissed = justMissed.map { Self.minutes(from: date, to: $0.date) } ?? 0
         groups = plan.groups(at: date).map { dest, trains in
             Group(destination: dest,
                   next: trains.first,
@@ -160,7 +165,7 @@ private struct SmallView: View {
                     }
                 }
             } else {
-                EmptyCard(note: snap.station.note)
+                EmptyCard(snap: snap)
             }
         }
     }
@@ -187,6 +192,15 @@ private struct MediumView: View {
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 0) {
                             CardTitle(line: next.line)
+                            Label {
+                                Text(next.date, style: .time)
+                            } icon: {
+                                Image(systemName: "clock.fill")
+                            }
+                            .font(Theme.rounded(12, .bold))
+                            .labelStyle(CompactLabelStyle())
+                            .opacity(0.85)
+                            .padding(.top, 4)
                             Spacer(minLength: 2)
                             Text(group.leaveText).font(Theme.rounded(13, .heavy))
                             if let note = snap.station.note {
@@ -203,7 +217,7 @@ private struct MediumView: View {
                     }
                 }
             } else {
-                EmptyCard(note: snap.station.note)
+                EmptyCard(snap: snap)
             }
         }
     }
@@ -305,7 +319,7 @@ private struct TerminalCard: View {
                 }
             }
         } else {
-            EmptyCard(note: "No train to \(group.destination.short)")
+            EmptyCard(title: "No train to \(group.destination.short)", detail: "Not posted yet")
         }
     }
 }
@@ -347,6 +361,16 @@ private struct CardPaint {
     }
 }
 
+/// Icon and title with a tight gap; the system label spacing is too loose at small sizes.
+private struct CompactLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon.font(Theme.rounded(10, .heavy))
+            configuration.title
+        }
+    }
+}
+
 /// Refetches trains in place (iOS 17 interactive widgets) without opening the app.
 private struct RefreshButton: View {
     var body: some View {
@@ -362,18 +386,41 @@ private struct RefreshButton: View {
     }
 }
 
+/// Nothing catchable. Says why: either the train is too close to make on foot
+/// (Transit-style "just missed", so you can decide whether to run), or PATH
+/// hasn't posted the next one yet — it only lists about two trains ahead.
 private struct EmptyCard: View {
-    let note: String?
+    let title: String
+    let detail: String
+
+    init(title: String, detail: String) {
+        self.title = title
+        self.detail = detail
+    }
+
+    init(snap: BoardSnapshot) {
+        if let missed = snap.justMissed {
+            title = "Too late for the \(missed.line.name)"
+            detail = missed.date.formatted(date: .omitted, time: .shortened)
+                + " · leaves in \(snap.minutesToMissed) min"
+        } else {
+            title = "Next train not posted yet"
+            detail = snap.station.note ?? "PATH lists about 2 trains ahead"
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
+            Image(systemName: "tram.fill")
+                .font(Theme.rounded(16, .heavy))
+                .foregroundStyle(.secondary)
             Spacer(minLength: 0)
-            Text("No train listed").font(Theme.rounded(14, .heavy))
-            if let note { Text(note).font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary) }
+            Text(title).font(Theme.rounded(14, .heavy)).lineLimit(2).minimumScaleFactor(0.8)
+            Text(detail).font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary).lineLimit(2)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

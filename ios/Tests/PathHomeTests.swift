@@ -245,6 +245,28 @@ final class HomeAndLinkTests: XCTestCase {
     }
 }
 
+final class JustMissedTests: XCTestCase {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    /// The real case seen live: one JSQ train 75s out on a 2 min walk.
+    func testTooCloseToWalkIsReportedNotHidden() {
+        let plan = Plan.sample(at: now, walkMinutes: 2, minutes: [0.75])  // departs +1:15
+        let snap = BoardSnapshot(plan: plan, at: now)
+        XCTAssertNil(snap.primary)
+        XCTAssertEqual(snap.justMissed, plan.departures[0])
+        XCTAssertEqual(snap.minutesToMissed, 1)
+        // Once it actually departs there's nothing to name.
+        XCTAssertNil(BoardSnapshot(plan: plan, at: plan.departures[0].date.addingTimeInterval(1)).justMissed)
+        // And the board redraws at that moment to drop it.
+        XCTAssertTrue(TimelineBuilder.redrawDates(for: plan, from: now).contains(plan.departures[0].date.addingTimeInterval(1)))
+    }
+
+    func testCatchableTrainIsNotReportedAsMissed() {
+        let plan = Plan.sample(at: now, walkMinutes: 2, minutes: [10])
+        XCTAssertNil(BoardSnapshot(plan: plan, at: now).justMissed)
+    }
+}
+
 final class RefreshAndRankingTests: XCTestCase {
     /// A refresh tap must refetch even when a fresh plan from the same spot exists,
     /// but keep the walk it already measured. Hits the live feed.

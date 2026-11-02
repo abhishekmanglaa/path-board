@@ -31,6 +31,10 @@ enum TimelineBuilder {
             }
             if missed <= end { dates.insert(missed) }
         }
+        // A "just missed" train is named until it actually leaves.
+        for d in plan.departures where d.date > now && d.date <= end && plan.leaveBy(d) < now {
+            dates.insert(d.date.addingTimeInterval(1))
+        }
         return dates.sorted()
     }
 
