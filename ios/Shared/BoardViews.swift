@@ -165,7 +165,7 @@ private struct SmallView: View {
                     }
                 }
             } else {
-                EmptyCard(snap: snap)
+                EmptyCard(snap: snap, compact: true)
             }
         }
     }
@@ -392,18 +392,33 @@ private struct RefreshButton: View {
 private struct EmptyCard: View {
     let title: String
     let detail: String
+    var compact = false
+    /// The missed train's line, to tint the card so it still reads as that line.
+    var line: PathLine?
 
     init(title: String, detail: String) {
         self.title = title
         self.detail = detail
     }
 
-    init(snap: BoardSnapshot) {
-        if let missed = snap.justMissed {
+    /// `compact` is the small widget: about 16 characters a line, so the wording
+    /// is cut down rather than truncated.
+    init(snap: BoardSnapshot, compact: Bool = false) {
+        self.compact = compact
+        line = snap.justMissed?.line
+        let time = snap.justMissed?.date.formatted(date: .omitted, time: .shortened) ?? ""
+        let leaving = snap.minutesToMissed < 1
+        switch (snap.justMissed, compact) {
+        case (let missed?, true):
+            title = "Too late"
+            detail = "\(missed.line.name)\n\(time) · " + (leaving ? "leaving now" : "in \(snap.minutesToMissed) min")
+        case (let missed?, false):
             title = "Too late for the \(missed.line.name)"
-            detail = missed.date.formatted(date: .omitted, time: .shortened)
-                + " · leaves in \(snap.minutesToMissed) min"
-        } else {
+            detail = "\(time) · " + (leaving ? "leaving now" : "leaves in \(snap.minutesToMissed) min")
+        case (nil, true):
+            title = "Not posted yet"
+            detail = snap.station.note ?? "PATH lists ~2 trains ahead"
+        case (nil, false):
             title = "Next train not posted yet"
             detail = snap.station.note ?? "PATH lists about 2 trains ahead"
         }
@@ -411,16 +426,20 @@ private struct EmptyCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Image(systemName: "tram.fill")
-                .font(Theme.rounded(16, .heavy))
-                .foregroundStyle(.secondary)
+            if !compact {
+                Image(systemName: "tram.fill")
+                    .font(Theme.rounded(16, .heavy))
+                    .foregroundStyle(.secondary)
+            }
             Spacer(minLength: 0)
             Text(title).font(Theme.rounded(14, .heavy)).lineLimit(2).minimumScaleFactor(0.8)
-            Text(detail).font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary).lineLimit(2)
+            Text(detail).font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary)
+                .lineLimit(2).minimumScaleFactor(0.85)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background((line?.color ?? .secondary).opacity(line == nil ? 0.14 : 0.22),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

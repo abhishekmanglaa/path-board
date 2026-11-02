@@ -15,13 +15,27 @@ extension Plan {
 }
 
 extension Station {
+    /// What to search Google Maps for. The station's name reads far better as a
+    /// destination than raw coordinates, and the city keeps it unambiguous.
+    var mapsQuery: String {
+        let city: String
+        switch id {
+        case "NWK": city = "Newark, NJ"
+        case "HAR": city = "Harrison, NJ"
+        case "HOB": city = "Hoboken, NJ"
+        case "JSQ", "GRV", "NEW", "EXP": city = "Jersey City, NJ"
+        default: city = "New York, NY"
+        }
+        return "\(name) PATH Station, \(city)"
+    }
+
     /// Google Maps walking directions here. The universal link opens the Google
     /// Maps app when it's installed and Google Maps on the web otherwise.
     var googleMapsWalkingURL: URL {
         var c = URLComponents(string: "https://www.google.com/maps/dir/")!
         c.queryItems = [
             URLQueryItem(name: "api", value: "1"),
-            URLQueryItem(name: "destination", value: "\(latitude),\(longitude)"),
+            URLQueryItem(name: "destination", value: mapsQuery),
             URLQueryItem(name: "travelmode", value: "walking"),
         ]
         return c.url!

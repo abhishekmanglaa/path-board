@@ -33,7 +33,10 @@ struct PathHomeApp: App {
               let station = Station.byID[id] else { return }
         // The app scheme goes straight into Google Maps; if it isn't installed,
         // open() reports failure and the web link takes over.
-        let app = URL(string: "comgooglemaps://?daddr=\(station.latitude),\(station.longitude)&directionsmode=walking")!
+        var components = URLComponents(string: "comgooglemaps://")!
+        components.queryItems = [URLQueryItem(name: "daddr", value: station.mapsQuery),
+                                 URLQueryItem(name: "directionsmode", value: "walking")]
+        let app = components.url!
         UIApplication.shared.open(app) { opened in
             if !opened { UIApplication.shared.open(station.googleMapsWalkingURL) }
         }

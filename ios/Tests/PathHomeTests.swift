@@ -224,7 +224,8 @@ final class HomeAndLinkTests: XCTestCase {
 
     func testGoogleMapsLink() {
         let url = Station.byID["33S"]!.googleMapsWalkingURL.absoluteString
-        XCTAssertEqual(url, "https://www.google.com/maps/dir/?api=1&destination=40.7488,-73.9884&travelmode=walking")
+        XCTAssertEqual(url, "https://www.google.com/maps/dir/?api=1&destination=33rd%20Street%20PATH%20Station,%20New%20York,%20NY&travelmode=walking")
+        XCTAssertEqual(Station.byID["NEW"]!.mapsQuery, "Newport PATH Station, Jersey City, NJ")
         let entry = BoardEntry(date: now, state: .plan(.sample(at: now, stationID: "WTC")))
         XCTAssertEqual(entry.deepLink.absoluteString, "pathhome://walk?station=WTC")
     }
