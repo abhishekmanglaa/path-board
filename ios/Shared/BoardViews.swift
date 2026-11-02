@@ -11,6 +11,16 @@ enum BoardState {
 struct BoardEntry: TimelineEntry {
     let date: Date
     let state: BoardState
+
+    /// Smart Stack ranking: rises as the moment to leave approaches, so a stack
+    /// rotates the train widget to the top when it actually matters.
+    var relevance: TimelineEntryRelevance? {
+        guard case .plan(let plan) = state, let g = BoardSnapshot(plan: plan, at: date).primary else {
+            return TimelineEntryRelevance(score: 0)
+        }
+        let score: Float = g.minutesToLeave <= 2 ? 1 : g.minutesToLeave <= 10 ? 0.7 : 0.3
+        return TimelineEntryRelevance(score: score, duration: 60)
+    }
 }
 
 /// What one moment of the board says, derived from a plan at `date`.
@@ -125,11 +135,15 @@ private struct SmallView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 1) {
-                WalkBadge(minutes: snap.walkMinutes, stale: stale)
-                Text(snap.station.shortName)
-                    .font(Theme.rounded(15, .heavy))
-                    .lineLimit(1).minimumScaleFactor(0.7)
+            HStack(alignment: .top, spacing: 4) {
+                VStack(alignment: .leading, spacing: 1) {
+                    WalkBadge(minutes: snap.walkMinutes, stale: stale)
+                    Text(snap.station.shortName)
+                        .font(Theme.rounded(15, .heavy))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+                RefreshButton()
             }
             if snap.station.isHome {
                 // Newport: one compact card per New York terminal.
@@ -141,7 +155,7 @@ private struct SmallView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         CardTitle(line: next.line)
                         Spacer(minLength: 2)
-                        BigMinutes(minutes: group.minutesToNext, size: 38, ink: next.line.ink)
+                        BigMinutes(minutes: group.minutesToNext, size: 38, line: next.line)
                         Text(group.leaveText).font(Theme.rounded(11, .heavy)).opacity(0.85)
                     }
                 }
@@ -162,6 +176,7 @@ private struct MediumView: View {
                 Text(snap.station.name).font(Theme.rounded(16, .heavy)).lineLimit(1)
                 Spacer()
                 WalkBadge(minutes: snap.walkMinutes, stale: stale)
+                RefreshButton()
             }
             if snap.station.isHome {
                 HStack(spacing: 8) {
@@ -180,7 +195,7 @@ private struct MediumView: View {
                         }
                         Spacer(minLength: 4)
                         VStack(alignment: .trailing, spacing: 0) {
-                            BigMinutes(minutes: group.minutesToNext, size: 46, ink: next.line.ink)
+                            BigMinutes(minutes: group.minutesToNext, size: 46, line: next.line)
                             if let then = group.followingText {
                                 Text(then).font(Theme.rounded(13, .heavy)).opacity(0.85)
                             }
@@ -196,17 +211,20 @@ private struct MediumView: View {
 
 /// "8 min" with the live mark, Transit-style.
 private struct BigMinutes: View {
+    @Environment(\.widgetRenderingMode) private var mode
     let minutes: Int
     let size: CGFloat
-    let ink: Color
+    let line: PathLine
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text("\(minutes)")
                 .font(Theme.rounded(size, .black))
                 .contentTransition(.numericText(countsDown: true))
+                .widgetAccentable()
+                .invalidatableContent()
             Text("min").font(Theme.rounded(size * 0.3, .heavy))
-            RealtimeMark(color: ink)
+            RealtimeMark(color: CardPaint(line: line, mode: mode).ink)
                 .frame(width: size * 0.3, height: size * 0.3)
                 .padding(.leading, 2)
         }
@@ -239,8 +257,10 @@ private struct CardTitle: View {
 private struct CompactCard: View {
     let group: BoardSnapshot.Group
 
+    @Environment(\.widgetRenderingMode) private var mode
+
     var body: some View {
-        let line = group.next?.line
+        let paint = group.next.map { CardPaint(line: $0.line, mode: mode) }
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(group.destination.short)
                 .font(Theme.rounded(13, .black))
@@ -250,15 +270,17 @@ private struct CompactCard: View {
                 Text("\(group.minutesToNext)")
                     .font(Theme.rounded(24, .black))
                     .contentTransition(.numericText(countsDown: true))
+                    .widgetAccentable()
+                    .invalidatableContent()
                 Text("min").font(Theme.rounded(10, .heavy))
             } else {
                 Text("—").font(Theme.rounded(20, .black))
             }
         }
-        .foregroundStyle(line?.ink ?? .secondary)
+        .foregroundStyle(paint?.ink ?? .secondary)
         .padding(.horizontal, 9)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(line?.color ?? Color.secondary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(paint?.fill ?? Color.secondary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -277,7 +299,7 @@ private struct TerminalCard: View {
                     }
                     .font(Theme.rounded(12, .bold)).opacity(0.85)
                     Spacer(minLength: 2)
-                    BigMinutes(minutes: group.minutesToNext, size: 34, ink: next.line.ink)
+                    BigMinutes(minutes: group.minutesToNext, size: 34, line: next.line)
                     Text(group.followingText ?? group.leaveText)
                         .font(Theme.rounded(11, .heavy)).opacity(0.85).lineLimit(1)
                 }
@@ -289,21 +311,54 @@ private struct TerminalCard: View {
 }
 
 private struct LineCard<Content: View>: View {
+    @Environment(\.widgetRenderingMode) private var mode
     let line: PathLine
     @ViewBuilder let content: Content
 
     var body: some View {
+        let paint = CardPaint(line: line, mode: mode)
         content
-            .foregroundStyle(line.ink)
+            .foregroundStyle(paint.ink)
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background {
                 ZStack(alignment: .leading) {
-                    line.color
-                    if let accent = line.accent { accent.frame(width: 5) }
+                    paint.fill
+                    if let accent = line.accent, paint.isFullColor { accent.frame(width: 5) }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Card colors for the current rendering mode. In full color it's the line's
+/// own fill and ink. In tinted (accented) and lock screen (vibrant) modes iOS
+/// paints everything in one tint, so a solid fill would swallow its own text:
+/// use a translucent plate with light text instead.
+private struct CardPaint {
+    let fill: Color
+    let ink: Color
+    let isFullColor: Bool
+
+    init(line: PathLine, mode: WidgetRenderingMode) {
+        isFullColor = mode == .fullColor
+        fill = isFullColor ? line.color : Color.white.opacity(0.16)
+        ink = isFullColor ? line.ink : .white
+    }
+}
+
+/// Refetches trains in place (iOS 17 interactive widgets) without opening the app.
+private struct RefreshButton: View {
+    var body: some View {
+        Button(intent: RefreshTrainsIntent()) {
+            Image(systemName: "arrow.clockwise")
+                .font(Theme.rounded(11, .heavy))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .background(.quaternary, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Refresh trains")
     }
 }
 

@@ -64,9 +64,12 @@ enum Planner {
     /// just computed it and asked the widget to reload.
     static let reuseWindow: TimeInterval = 60
 
-    static func plan(from here: CLLocation, previous: Plan? = SharedStore.lastPlan, now: Date = Date()) async throws -> Plan {
+    /// `forceFresh` (a refresh tap) always refetches trains, but still reuses the
+    /// walk when you haven't moved.
+    static func plan(from here: CLLocation, previous: Plan? = SharedStore.lastPlan, now: Date = Date(),
+                     forceFresh: Bool = false) async throws -> Plan {
         let sameSpot = previous.map { $0.origin.distance(from: here) < sameSpotMeters } ?? false
-        if let previous, sameSpot, now.timeIntervalSince(previous.computedAt) < reuseWindow {
+        if let previous, sameSpot, !forceFresh, now.timeIntervalSince(previous.computedAt) < reuseWindow {
             return previous
         }
 

@@ -26,6 +26,7 @@ struct ContentView: View {
                 .padding(16)
             }
             .refreshable { monitor.refresh() }
+            .sensoryFeedback(.success, trigger: monitor.plan?.computedAt)
             .navigationTitle("Train Home")
             .toolbar {
                 Button { monitor.refresh() } label: {
@@ -50,12 +51,32 @@ private struct AccessBanner: View {
                  : "PATH Home uses your location to pick the closest station and time the walk there.")
                 .font(Theme.rounded(14, .medium)).foregroundStyle(.secondary)
             Button(monitor.hasAnyAccess ? "Allow Always" : "Allow Location") { monitor.requestAccess() }
-                .buttonStyle(.borderedProminent).tint(Theme.walk)
+                .modernProminentButton()
+                .tint(Theme.walk)
                 .font(Theme.rounded(15, .heavy))
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .modernCard(cornerRadius: 20)
+    }
+}
+
+/// Liquid Glass on iOS 26+, the closest pre-26 equivalent otherwise.
+private extension View {
+    @ViewBuilder func modernCard(cornerRadius: CGFloat) -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+
+    @ViewBuilder func modernProminentButton() -> some View {
+        if #available(iOS 26, *) {
+            buttonStyle(.glassProminent)
+        } else {
+            buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
+        }
     }
 }
 
@@ -85,7 +106,7 @@ private struct Departures: View {
                     TrainRow(plan: plan, train: train, now: now)
                 }
             }
-            Text("Updated \(plan.computedAt.formatted(date: .omitted, time: .shortened))")
+            Text("Updated \(plan.computedAt, style: .relative) ago")
                 .font(Theme.rounded(12, .medium)).foregroundStyle(.tertiary)
         }
     }

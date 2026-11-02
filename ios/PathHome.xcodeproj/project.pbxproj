@@ -11,6 +11,7 @@
 		1A485ED3DFEE4EB766A3E922 /* Planner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EADAAD18BD64F1EFABAA76 /* Planner.swift */; };
 		1A9BA50BA6528C953A2A1A20 /* LocationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEBCAE6D9B37DD3A434BDC0 /* LocationMonitor.swift */; };
 		21A5F79F76110160115A1912 /* PathHomeWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 870723A6825A9195CAA297A3 /* PathHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		38727609EF6DDC5CFE69C729 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */; };
 		39D0C9DF10CBE446C7AB6B8E /* Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = C483453D8B67CE8E68ACEDBA /* Samples.swift */; };
 		74C68948576EBA85D0E4B126 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */; };
 		8338E0FC62C2E06044A57752 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F24C9C67F24EA8CA811EB14 /* ContentView.swift */; };
@@ -18,10 +19,12 @@
 		91ADC3ADDD6373C404D2B48A /* BoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E33595A98F575A21FAE398 /* BoardViews.swift */; };
 		9887164D31F0957D8DFC2530 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328BEE406BC709618E109B26 /* Theme.swift */; };
 		A0EF1745845BA37AAFBC5667 /* BoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E33595A98F575A21FAE398 /* BoardViews.swift */; };
+		A3A2E1029B8889EF5ED29BB4 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */; };
 		A5B66A9CCB466F29D7B418EA /* Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = C483453D8B67CE8E68ACEDBA /* Samples.swift */; };
 		BB588755CEAB4F3B57D60168 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328BEE406BC709618E109B26 /* Theme.swift */; };
 		C0FD74539495002ACB235B16 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */; };
 		D2266097D2A060AEA78D2A4B /* PathHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 626ED1B495394693FBF9337B /* PathHomeWidget.swift */; };
+		D7A19A1201F51D1117059456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */; };
 		D9803F98B1AC4EB6124DD389 /* PathHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FA1574B834E19C1AC23DDB /* PathHomeTests.swift */; };
 		DA689B3AADAC7B4EAA63A960 /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
 		EA841A6B4E190F986B38835B /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
@@ -71,8 +74,10 @@
 		7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		870723A6825A9195CAA297A3 /* PathHomeWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PathHomeWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F24C9C67F24EA8CA811EB14 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshIntent.swift; sourceTree = "<group>"; };
 		91CEC0082C70DDB96F2EA982 /* PathHomeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathHomeWidget.entitlements; sourceTree = "<group>"; };
 		B2E33595A98F575A21FAE398 /* BoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardViews.swift; sourceTree = "<group>"; };
+		BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BDD877E0BB226B00F415BCE7 /* PathHomeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PathHomeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C483453D8B67CE8E68ACEDBA /* Samples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Samples.swift; sourceTree = "<group>"; };
 		CE99A69AB1D97B192CA7E8FA /* TimelineBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineBuilder.swift; sourceTree = "<group>"; };
@@ -117,6 +122,7 @@
 			children = (
 				B2E33595A98F575A21FAE398 /* BoardViews.swift */,
 				D9EADAAD18BD64F1EFABAA76 /* Planner.swift */,
+				90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */,
 				C483453D8B67CE8E68ACEDBA /* Samples.swift */,
 				7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */,
 				045D461805193F1FC631DEEB /* Stations.swift */,
@@ -129,6 +135,7 @@
 		BE27C48894185A1A1A1D593F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */,
 				8F24C9C67F24EA8CA811EB14 /* ContentView.swift */,
 				706BDC6582F8476A90F0F7E0 /* Info.plist */,
 				2BEBCAE6D9B37DD3A434BDC0 /* LocationMonitor.swift */,
@@ -191,6 +198,7 @@
 			buildConfigurationList = 7D2794A5A681E48E759A6C40 /* Build configuration list for PBXNativeTarget "PathHome" */;
 			buildPhases = (
 				49AB015C4C85EAFA5A924C63 /* Sources */,
+				C8E0BD51BB31DCC97A0BF582 /* Resources */,
 				AE15C31C02121DDA648086FB /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -249,6 +257,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C8E0BD51BB31DCC97A0BF582 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D7A19A1201F51D1117059456 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		49AB015C4C85EAFA5A924C63 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -259,6 +278,7 @@
 				1A9BA50BA6528C953A2A1A20 /* LocationMonitor.swift in Sources */,
 				13F879FD84B2814818707CF8 /* PathHomeApp.swift in Sources */,
 				833E869739116C5240E9E924 /* Planner.swift in Sources */,
+				38727609EF6DDC5CFE69C729 /* RefreshIntent.swift in Sources */,
 				39D0C9DF10CBE446C7AB6B8E /* Samples.swift in Sources */,
 				C0FD74539495002ACB235B16 /* SharedStore.swift in Sources */,
 				DA689B3AADAC7B4EAA63A960 /* Stations.swift in Sources */,
@@ -282,6 +302,7 @@
 				A0EF1745845BA37AAFBC5667 /* BoardViews.swift in Sources */,
 				D2266097D2A060AEA78D2A4B /* PathHomeWidget.swift in Sources */,
 				1A485ED3DFEE4EB766A3E922 /* Planner.swift in Sources */,
+				A3A2E1029B8889EF5ED29BB4 /* RefreshIntent.swift in Sources */,
 				A5B66A9CCB466F29D7B418EA /* Samples.swift in Sources */,
 				74C68948576EBA85D0E4B126 /* SharedStore.swift in Sources */,
 				EA841A6B4E190F986B38835B /* Stations.swift in Sources */,
@@ -326,7 +347,7 @@
 		0D16F34A96D9AD875D7E6B0F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/PathHome.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;
@@ -359,7 +380,7 @@
 		4E0A56A2C6CB4FADA8400BE9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/PathHome.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;

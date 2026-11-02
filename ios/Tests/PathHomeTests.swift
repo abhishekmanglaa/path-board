@@ -245,6 +245,28 @@ final class HomeAndLinkTests: XCTestCase {
     }
 }
 
+final class RefreshAndRankingTests: XCTestCase {
+    /// A refresh tap must refetch even when a fresh plan from the same spot exists,
+    /// but keep the walk it already measured. Hits the live feed.
+    func testRefreshTapRefetchesButKeepsTheWalk() async throws {
+        let previous = Plan.sample(at: Date().addingTimeInterval(-5), stationID: "33S", walkMinutes: 4)
+        let plan = try await Planner.plan(from: previous.origin, previous: previous, forceFresh: true)
+        XCTAssertGreaterThan(plan.computedAt, previous.computedAt)
+        XCTAssertEqual(plan.walkSeconds, previous.walkSeconds)
+        XCTAssertEqual(plan.stationID, "33S")
+    }
+
+    func testSmartStackRanksUrgentTrainsHigher() {
+        let now = Date()
+        func score(_ minutes: Double) -> Float {
+            BoardEntry(date: now, state: .plan(.sample(at: now, walkMinutes: 4, minutes: [minutes]))).relevance!.score
+        }
+        XCTAssertGreaterThan(score(6), score(12))
+        XCTAssertGreaterThan(score(12), score(40))
+        XCTAssertEqual(BoardEntry(date: now, state: .needsLocation).relevance?.score, 0)
+    }
+}
+
 /// Hits the real PANYNJ feed. Catches the feed renaming headsigns or station codes.
 final class LiveFeedTests: XCTestCase {
     func testEveryStationIsInTheFeedAndHeadsignsAreKnown() async throws {
