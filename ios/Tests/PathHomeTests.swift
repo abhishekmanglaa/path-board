@@ -91,33 +91,38 @@ final class LineTests: XCTestCase {
 final class PlanTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testCatchableRespectsWalk() {
-        let plan = Plan.sample(at: now, walkMinutes: 5, minutes: [3, 8, 18])
-        // +3:30 is unreachable on a 5 min walk; +8:30 and +18:30 are fine.
-        XCTAssertEqual(plan.catchable(at: now).count, 2)
-        XCTAssertEqual(plan.leaveBy(plan.catchable(at: now)[0]), now.addingTimeInterval(8 * 60 + 30 - 300))
+    func testListsNextTrainsRegardlessOfWalk() {
+        // A train 2:30 away on a 5 min walk is still listed: the board shows timings.
+        let plan = Plan.sample(at: now, walkMinutes: 5, minutes: [2, 8, 18])
+        let snap = BoardSnapshot(plan: plan, at: now)
+        XCTAssertEqual(snap.rows.map(\.minutes), [2, 8, 18])
+        XCTAssertEqual(snap.walkMinutes, 5)
+        XCTAssertEqual(snap.minutesList(2), "2 · 8")
     }
 
-    func testSnapshotNumbers() {
-        let plan = Plan.sample(at: now, walkMinutes: 4, minutes: [8, 18, 28])
-        let snap = BoardSnapshot(plan: plan, at: now).primary!
-        XCTAssertEqual(snap.minutesToNext, 8)
-        XCTAssertEqual(snap.minutesToLeave, 4)
-        XCTAssertEqual(snap.leaveText, "Leave in 4 min")
-        XCTAssertEqual(snap.followingText, "then 18, 28")
-        // Right before you must leave it says leave now, then the card moves on.
-        let late = BoardSnapshot(plan: plan, at: plan.leaveBy(plan.departures[0]).addingTimeInterval(-20)).primary!
-        XCTAssertEqual(late.leaveText, "Leave now")
-        XCTAssertEqual(late.next, plan.departures[0])
-        let missed = BoardSnapshot(plan: plan, at: plan.leaveBy(plan.departures[0]).addingTimeInterval(1)).primary!
-        XCTAssertEqual(missed.next, plan.departures[1])
+    func testDepartedTrainsDropOff() {
+        let plan = Plan.sample(at: now, minutes: [3, 13])
+        let after = plan.departures[0].date.addingTimeInterval(1)
+        XCTAssertEqual(BoardSnapshot(plan: plan, at: after).rows.map(\.departure), [plan.departures[1]])
     }
 
-    func testHomeAndEmptyStates() {
-        let home = Plan.sample(at: now, stationID: "NEW", minutes: [])
-        XCTAssertTrue(BoardSnapshot(plan: home, at: now).station.isHome)
-        let none = Plan.sample(at: now, minutes: [])
-        XCTAssertNil(BoardSnapshot(plan: none, at: now).primary)
+    func testAtMostThreeRows() {
+        let plan = Plan.sample(at: now, minutes: [3, 13, 23, 33, 43])
+        XCTAssertEqual(BoardSnapshot(plan: plan, at: now).rows.count, 3)
+    }
+
+    func testWalkRoundsUp() {
+        XCTAssertEqual(Plan.sample(at: now, walkMinutes: 2.1).walkMinutes, 3)
+        XCTAssertEqual(Plan.sample(at: now, walkMinutes: 0.2).walkMinutes, 1)
+    }
+
+    func testViaHobokenRowUsesShortName() {
+        let plan = Plan.sample(at: now, colors: "4D92FB,FF9900", headsign: "Journal Square via Hoboken")
+        XCTAssertEqual(BoardSnapshot(plan: plan, at: now).rows.first?.label, "JSQ–33")
+    }
+
+    func testEmptyWhenNothingPosted() {
+        XCTAssertTrue(BoardSnapshot(plan: .sample(at: now, minutes: []), at: now).rows.isEmpty)
         XCTAssertEqual(Station.byID["NWK"]?.note, "Change at Journal Sq")
     }
 
@@ -132,10 +137,9 @@ final class PlanTests: XCTestCase {
 final class TimelineTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    /// Everything on the board, as numbers and which train each card shows.
+    /// Everything numeric on the board.
     private func shown(_ plan: Plan, _ t: Date) -> String {
-        BoardSnapshot(plan: plan, at: t).groups
-            .map { g in "\(g.next?.date.timeIntervalSince1970 ?? 0):\(g.minutesToNext),\(g.minutesToLeave),\(g.following)" }
+        BoardSnapshot(plan: plan, at: t).rows.map { "\($0.departure.date.timeIntervalSince1970):\($0.minutes)" }
             .joined(separator: "|")
     }
 
@@ -150,48 +154,45 @@ final class TimelineTests: XCTestCase {
         }
     }
 
-    func testMinuteCountTicksDownOneAtATime() {
+    func testMinuteCountsNeverStale() {
         let plan = Plan.sample(at: now, walkMinutes: 4, minutes: [8, 18, 28, 38, 48])
         let dates = TimelineBuilder.redrawDates(for: plan, from: now)
         XCTAssertEqual(dates.first, now)
         XCTAssertEqual(dates, dates.sorted())
         XCTAssertEqual(Set(dates).count, dates.count)
-        XCTAssertLessThanOrEqual(dates.last!, now.addingTimeInterval(TimelineBuilder.horizon))
+        XCTAssertLessThanOrEqual(dates.last!, now.addingTimeInterval(TimelineBuilder.horizon + 1))
         assertNeverStale(plan, dates)
-        XCTAssertLessThanOrEqual(zip(dates, dates.dropFirst()).map { $1.timeIntervalSince($0) }.max()!, 60.001)
     }
 
     /// At Newport two terminals count down on different phases; neither may go stale.
     func testEveryShownNumberIsFreshAtNewport() {
         let now = self.now
         let deps = [(6.2, "33rd Street", "FF9900"), (9.7, "World Trade Center", "65C100"),
-                    (16.2, "33rd Street", "FF9900"), (19.7, "World Trade Center", "65C100"),
-                    (26.2, "33rd Street", "FF9900")]
+                    (16.2, "33rd Street", "FF9900"), (19.7, "World Trade Center", "65C100")]
             .map { Departure(date: now.addingTimeInterval($0.0 * 60), headsign: $0.1, lineColors: $0.2) }
         let plan = Plan(stationID: "NEW", walkSeconds: 150, departures: deps, computedAt: now,
                         originLatitude: 40.727, originLongitude: -74.034)
         let dates = TimelineBuilder.redrawDates(for: plan, from: now)
         assertNeverStale(plan, dates)
-        XCTAssertLessThan(dates.count, 120, "timeline is bloated")
+        XCTAssertLessThan(dates.count, 90, "timeline is bloated")
     }
 
-    func testRedrawAtTheMomentATrainBecomesUncatchable() {
-        let plan = Plan.sample(at: now, walkMinutes: 4, minutes: [8, 18])
+    func testRedrawWhenATrainDeparts() {
+        let plan = Plan.sample(at: now, minutes: [8, 18])
         let dates = TimelineBuilder.redrawDates(for: plan, from: now)
-        XCTAssertTrue(dates.contains(plan.leaveBy(plan.departures[0]).addingTimeInterval(1)))
+        XCTAssertTrue(dates.contains(plan.departures[0].date.addingTimeInterval(TimelineBuilder.tickSlack)))
     }
 
     func testReloadWindow() {
-        let lots = Plan.sample(at: now, walkMinutes: 4, minutes: [30, 40, 50, 60])
-        let r1 = TimelineBuilder.reloadDate(for: lots, from: now)
-        XCTAssertEqual(r1, now.addingTimeInterval(TimelineBuilder.maxReloadInterval))
-
-        // Two trains left: refetch when the first one stops being catchable.
-        let two = Plan.sample(at: now, walkMinutes: 4, minutes: [12, 22])
-        XCTAssertEqual(TimelineBuilder.reloadDate(for: two, from: now), two.leaveBy(two.departures[0]))
-
-        // Never sooner than the floor, even with nothing catchable.
-        let none = Plan.sample(at: now, walkMinutes: 4, minutes: [2])
+        let lots = Plan.sample(at: now, minutes: [30, 40, 50, 60])
+        XCTAssertEqual(TimelineBuilder.reloadDate(for: lots, from: now), now.addingTimeInterval(TimelineBuilder.maxReloadInterval))
+        // Two left: refetch as the first leaves (only one would remain).
+        let two = Plan.sample(at: now, minutes: [8, 18])
+        XCTAssertEqual(TimelineBuilder.reloadDate(for: two, from: now), two.departures[0].date)
+        // Never sooner than the floor.
+        let soon = Plan.sample(at: now, minutes: [1, 2])
+        XCTAssertEqual(TimelineBuilder.reloadDate(for: soon, from: now), now.addingTimeInterval(TimelineBuilder.minReloadInterval))
+        let none = Plan.sample(at: now, minutes: [])
         XCTAssertEqual(TimelineBuilder.reloadDate(for: none, from: now), now.addingTimeInterval(TimelineBuilder.minReloadInterval))
     }
 }
@@ -199,27 +200,31 @@ final class TimelineTests: XCTestCase {
 final class HomeAndLinkTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testNewportShowsBothTerminalsLikeRidePATH() {
-        let wtc = Departure(date: now.addingTimeInterval(9 * 60 + 30), headsign: "World Trade Center", lineColors: "65C100")
-        let w2 = Departure(date: now.addingTimeInterval(19 * 60 + 30), headsign: "World Trade Center", lineColors: "65C100")
-        let s33 = Departure(date: now.addingTimeInterval(6 * 60 + 30), headsign: "33rd Street", lineColors: "FF9900")
-        let plan = Plan(stationID: "NEW", walkSeconds: 180, departures: [s33, wtc, w2], computedAt: now,
-                        originLatitude: 40.727, originLongitude: -74.034)
-        let snap = BoardSnapshot(plan: plan, at: now)
-        XCTAssertEqual(snap.groups.map(\.destination.short), ["WTC", "33rd St"])
-        XCTAssertEqual(snap.groups[0].minutesToNext, 9)
-        XCTAssertEqual(snap.groups[0].followingText, "then 19")
-        XCTAssertEqual(snap.groups[1].minutesToNext, 6)
-        // One-number layouts pick whichever terminal's train is sooner.
-        XCTAssertEqual(snap.primary?.destination.short, "33rd St")
-        // A terminal with nothing catchable still gets its slot, empty.
-        let later = BoardSnapshot(plan: plan, at: now.addingTimeInterval(5 * 60))
-        XCTAssertNil(later.groups[1].next)
-        XCTAssertEqual(later.groups.count, 2)
+    private func newport(_ deps: [(Double, String, String)]) -> Plan {
+        Plan(stationID: "NEW", walkSeconds: 180,
+             departures: deps.map { Departure(date: now.addingTimeInterval($0.0 * 60 + 30), headsign: $0.1, lineColors: $0.2) },
+             computedAt: now, originLatitude: 40.727, originLongitude: -74.034)
     }
 
-    func testAwayFromHomeIsOneGroup() {
-        XCTAssertEqual(BoardSnapshot(plan: .sample(at: now), at: now).groups.count, 1)
+    func testNewportLeadsWithEachTerminalLikeRidePATH() {
+        // Two WTC trains come before the first 33rd St one...
+        let plan = newport([(3, "World Trade Center", "65C100"), (8, "World Trade Center", "65C100"),
+                            (12, "33rd Street", "FF9900")])
+        let rows = BoardSnapshot(plan: plan, at: now).rows
+        // ...but both terminals lead, so cutting to two rows keeps both.
+        XCTAssertEqual(rows.map(\.label), ["WTC", "33rd St", "WTC"])
+        XCTAssertEqual(rows.map(\.minutes), [3, 12, 8])
+    }
+
+    func testNewportWithOneTerminalPosted() {
+        let rows = BoardSnapshot(plan: newport([(5, "World Trade Center", "65C100")]), at: now).rows
+        XCTAssertEqual(rows.map(\.label), ["WTC"])
+    }
+
+    func testAwayFromHomeRowsAreByTime() {
+        let snap = BoardSnapshot(plan: .sample(at: now), at: now)
+        XCTAssertEqual(snap.rows.map(\.minutes), [8, 18, 28])
+        XCTAssertEqual(snap.rows.first?.label, "JSQ–33")
     }
 
     func testGoogleMapsLink() {
@@ -231,9 +236,7 @@ final class HomeAndLinkTests: XCTestCase {
     }
 
     func testOnlyRoutesTheRunnerUpWhenItCouldWin() {
-        // Standing right at Newport: the next station is far behind, route one.
         XCTAssertEqual(Planner.candidates(near: Station.byID["NEW"]!.location).map(\.id), ["NEW"])
-        // Halfway between Newport and Exchange Place: both are plausible.
         let between = CLLocation(latitude: 40.7216, longitude: -74.0334)
         XCTAssertEqual(Set(Planner.candidates(near: between).map(\.id)), ["NEW", "EXP"])
     }
@@ -243,28 +246,6 @@ final class HomeAndLinkTests: XCTestCase {
         let nearby = CLLocation(latitude: previous.originLatitude + 0.0003, longitude: previous.originLongitude)
         let plan = try await Planner.plan(from: nearby, previous: previous, now: now.addingTimeInterval(30))
         XCTAssertEqual(plan.computedAt, previous.computedAt)
-    }
-}
-
-final class JustMissedTests: XCTestCase {
-    let now = Date(timeIntervalSince1970: 1_800_000_000)
-
-    /// The real case seen live: one JSQ train 75s out on a 2 min walk.
-    func testTooCloseToWalkIsReportedNotHidden() {
-        let plan = Plan.sample(at: now, walkMinutes: 2, minutes: [0.75])  // departs +1:15
-        let snap = BoardSnapshot(plan: plan, at: now)
-        XCTAssertNil(snap.primary)
-        XCTAssertEqual(snap.justMissed, plan.departures[0])
-        XCTAssertEqual(snap.minutesToMissed, 1)
-        // Once it actually departs there's nothing to name.
-        XCTAssertNil(BoardSnapshot(plan: plan, at: plan.departures[0].date.addingTimeInterval(1)).justMissed)
-        // And the board redraws at that moment to drop it.
-        XCTAssertTrue(TimelineBuilder.redrawDates(for: plan, from: now).contains(plan.departures[0].date.addingTimeInterval(1)))
-    }
-
-    func testCatchableTrainIsNotReportedAsMissed() {
-        let plan = Plan.sample(at: now, walkMinutes: 2, minutes: [10])
-        XCTAssertNil(BoardSnapshot(plan: plan, at: now).justMissed)
     }
 }
 

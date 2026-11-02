@@ -27,6 +27,7 @@
 		D7A19A1201F51D1117059456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */; };
 		D9803F98B1AC4EB6124DD389 /* PathHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FA1574B834E19C1AC23DDB /* PathHomeTests.swift */; };
 		DA689B3AADAC7B4EAA63A960 /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
+		DF6B9C809D5BE8CEE70B474B /* RenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BC71C49E8393512381BDB5B /* RenderTests.swift */; };
 		EA841A6B4E190F986B38835B /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
 		EF093286BA57B57033FA463E /* TimelineBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE99A69AB1D97B192CA7E8FA /* TimelineBuilder.swift */; };
 		EF3D56C0E918B80689342977 /* TimelineBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE99A69AB1D97B192CA7E8FA /* TimelineBuilder.swift */; };
@@ -76,6 +77,7 @@
 		8F24C9C67F24EA8CA811EB14 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshIntent.swift; sourceTree = "<group>"; };
 		91CEC0082C70DDB96F2EA982 /* PathHomeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathHomeWidget.entitlements; sourceTree = "<group>"; };
+		9BC71C49E8393512381BDB5B /* RenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderTests.swift; sourceTree = "<group>"; };
 		B2E33595A98F575A21FAE398 /* BoardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardViews.swift; sourceTree = "<group>"; };
 		BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BDD877E0BB226B00F415BCE7 /* PathHomeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PathHomeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +94,7 @@
 			isa = PBXGroup;
 			children = (
 				E0FA1574B834E19C1AC23DDB /* PathHomeTests.swift */,
+				9BC71C49E8393512381BDB5B /* RenderTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -292,6 +295,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D9803F98B1AC4EB6124DD389 /* PathHomeTests.swift in Sources */,
+				DF6B9C809D5BE8CEE70B474B /* RenderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -30,6 +30,19 @@ struct PathLine: Hashable {
 
     /// Card text: whichever of near-black or white reads better on the fill.
     let ink: Color
+
+    /// For tight rows: the via-Hoboken run is already marked by its blue stripe.
+    var shortName: String { name.replacingOccurrences(of: " via HOB", with: "") }
+
+    /// Destination as riders abbreviate it, for rows that can't fit the full name.
+    var towardsShort: String {
+        switch towards {
+        case "World Trade Ctr": return "WTC"
+        case "Journal Square": return "Journal Sq"
+        case "33rd Street": return "33rd St"
+        default: return towards
+        }
+    }
 }
 
 /// Plain sRGB components, so contrast math doesn't round-trip through UIColor.

@@ -12,59 +12,67 @@ struct BoardEntry: TimelineEntry {
     let date: Date
     let state: BoardState
 
-    /// Smart Stack ranking: rises as the moment to leave approaches, so a stack
-    /// rotates the train widget to the top when it actually matters.
+    /// Smart Stack ranking: rises as the next train gets close to the walk time,
+    /// so a stack rotates the train widget to the top when it actually matters.
     var relevance: TimelineEntryRelevance? {
-        guard case .plan(let plan) = state, let g = BoardSnapshot(plan: plan, at: date).primary else {
+        guard case .plan(let plan) = state, let next = BoardSnapshot(plan: plan, at: date).rows.first else {
             return TimelineEntryRelevance(score: 0)
         }
-        let score: Float = g.minutesToLeave <= 2 ? 1 : g.minutesToLeave <= 10 ? 0.7 : 0.3
+        let slack = next.minutes - plan.walkMinutes
+        let score: Float = slack <= 3 ? 1 : slack <= 12 ? 0.7 : 0.3
         return TimelineEntryRelevance(score: score, duration: 60)
     }
 }
 
 /// What one moment of the board says, derived from a plan at `date`.
 struct BoardSnapshot {
-    struct Group {
-        let destination: Destination
-        let next: Departure?
-        let minutesToNext: Int
-        let minutesToLeave: Int
-        /// Minutes to the next two trains after `next`.
-        let following: [Int]
+    struct Row: Hashable {
+        let departure: Departure
+        /// Whole minutes until it leaves, rounded down like a departure board.
+        let minutes: Int
+        /// What the row is called: the line away from home, the terminal at Newport.
+        let label: String
 
-        var leaveText: String { minutesToLeave < 1 ? "Leave now" : "Leave in \(minutesToLeave) min" }
-        var followingText: String? {
-            following.isEmpty ? nil : "then " + following.map(String.init).joined(separator: ", ")
-        }
+        var line: PathLine { departure.line }
     }
 
     let station: Station
     let walkMinutes: Int
-    let groups: [Group]
-    /// When nothing is catchable: the train you'd need to run for, if any.
-    let justMissed: Departure?
-    let minutesToMissed: Int
+    /// Up to three trains, in display order; layouts show as many as fit.
+    let rows: [Row]
 
     init(plan: Plan, at date: Date) {
         station = plan.station
         walkMinutes = plan.walkMinutes
-        justMissed = plan.justMissed(at: date)
-        minutesToMissed = justMissed.map { Self.minutes(from: date, to: $0.date) } ?? 0
-        groups = plan.groups(at: date).map { dest, trains in
-            Group(destination: dest,
-                  next: trains.first,
-                  minutesToNext: trains.first.map { Self.minutes(from: date, to: $0.date) } ?? 0,
-                  minutesToLeave: trains.first.map { Self.minutes(from: date, to: plan.leaveBy($0)) } ?? 0,
-                  following: trains.dropFirst().prefix(2).map { Self.minutes(from: date, to: $0.date) })
+        let home = plan.station.isHome
+        rows = plan.rows(at: date).prefix(3).map { d in
+            Row(departure: d,
+                minutes: Self.minutes(from: date, to: d.date),
+                label: home ? Self.terminal(for: d, at: plan.station) : d.line.shortName)
         }
     }
 
-    /// Whole minutes remaining, rounded down like a departure board.
     static func minutes(from date: Date, to target: Date) -> Int { max(0, Int(target.timeIntervalSince(date) / 60)) }
 
-    /// The soonest train across groups: what the one-number layouts show.
-    var primary: Group? { groups.filter { $0.next != nil }.min { $0.minutesToNext < $1.minutesToNext } }
+    private static func terminal(for d: Departure, at station: Station) -> String {
+        station.destinations.first { $0.includes(d) }?.short ?? d.line.shortName
+    }
+
+    /// "4 · 14 · 24" for the first `count` trains.
+    func minutesList(_ count: Int) -> String {
+        rows.prefix(count).map { "\($0.minutes)" }.joined(separator: " · ")
+    }
+
+    /// At Newport, minutes per terminal in order ("WTC" → [6, 16]), so one-line
+    /// layouts never put a 33rd St time under a WTC label.
+    var terminals: [(label: String, minutes: [Int])] {
+        var out: [(label: String, minutes: [Int])] = []
+        for r in rows {
+            if let i = out.firstIndex(where: { $0.label == r.label }) { out[i].minutes.append(r.minutes) }
+            else { out.append((r.label, [r.minutes])) }
+        }
+        return out
+    }
 }
 
 extension Station {
@@ -91,9 +99,10 @@ struct BoardView: View {
         case .failed(_, let stale?):
             PlanView(snap: BoardSnapshot(plan: stale, at: entry.date), family: family, stale: true)
         case .failed(let message, nil):
-            MessageView(icon: "exclamationmark.triangle.fill", text: message, family: family)
+            MessageView(icon: "exclamationmark.triangle.fill", text: message, short: "Trains unavailable", family: family)
         case .needsLocation:
-            MessageView(icon: "location.slash.fill", text: "Open PATH Home to share your location", family: family)
+            MessageView(icon: "location.slash.fill", text: "Open PATH Home to share your location",
+                        short: "Open app for location", family: family)
         }
     }
 }
@@ -131,6 +140,34 @@ private struct WalkBadge: View {
             }
         }
         .foregroundStyle(Theme.walk)
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(minutes) minute walk")
+    }
+}
+
+/// Shows as many rows as fit (3, else 2, else 1), so a third train appears only
+/// where there's room for it — no clipping on smaller widget sizes.
+private struct TrainList<RowView: View>: View {
+    let rows: [BoardSnapshot.Row]
+    let spacing: CGFloat
+    let row: (BoardSnapshot.Row, Bool) -> RowView
+
+    var body: some View {
+        if rows.isEmpty {
+            EmptyCard()
+        } else {
+            ViewThatFits(in: .vertical) {
+                ForEach([3, 2, 1].filter { $0 <= rows.count }, id: \.self) { count in
+                    VStack(spacing: spacing) {
+                        ForEach(Array(rows.prefix(count).enumerated()), id: \.element) { i, r in
+                            row(r, i == 0)
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
     }
 }
 
@@ -141,7 +178,7 @@ private struct SmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 4) {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 0) {
                     WalkBadge(minutes: snap.walkMinutes, stale: stale)
                     Text(snap.station.shortName)
                         .font(Theme.rounded(15, .heavy))
@@ -150,24 +187,32 @@ private struct SmallView: View {
                 Spacer(minLength: 0)
                 RefreshButton()
             }
-            if snap.station.isHome {
-                // Newport: one compact card per New York terminal.
-                VStack(spacing: 5) {
-                    ForEach(snap.groups, id: \.destination) { CompactCard(group: $0) }
-                }
-            } else if let group = snap.primary, let next = group.next {
-                LineCard(line: next.line) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        CardTitle(line: next.line)
-                        Spacer(minLength: 2)
-                        BigMinutes(minutes: group.minutesToNext, size: 38, line: next.line)
-                        Text(group.leaveText).font(Theme.rounded(11, .heavy)).opacity(0.85)
-                    }
-                }
-            } else {
-                EmptyCard(snap: snap, compact: true)
+            TrainList(rows: snap.rows, spacing: 4) { row, _ in
+                SmallRow(row: row)
             }
         }
+    }
+}
+
+private struct SmallRow: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    let row: BoardSnapshot.Row
+
+    var body: some View {
+        let paint = CardPaint(line: row.line, mode: mode)
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(row.label)
+                .font(Theme.rounded(12, .black))
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Spacer(minLength: 2)
+            Minutes(value: row.minutes, size: 17)
+        }
+        .foregroundStyle(paint.ink)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(row.label) in \(row.minutes) minutes")
     }
 }
 
@@ -177,178 +222,86 @@ private struct MediumView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(snap.station.name).font(Theme.rounded(16, .heavy)).lineLimit(1)
-                Spacer()
+            HStack(alignment: .center, spacing: 8) {
+                Text(snap.station.name)
+                    .font(Theme.rounded(16, .heavy))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
                 WalkBadge(minutes: snap.walkMinutes, stale: stale)
                 RefreshButton()
             }
-            if snap.station.isHome {
-                HStack(spacing: 8) {
-                    ForEach(snap.groups, id: \.destination) { TerminalCard(group: $0) }
-                }
-            } else if let group = snap.primary, let next = group.next {
-                LineCard(line: next.line) {
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            CardTitle(line: next.line)
-                            Label {
-                                Text(next.date, style: .time)
-                            } icon: {
-                                Image(systemName: "clock.fill")
-                            }
-                            .font(Theme.rounded(12, .bold))
-                            .labelStyle(CompactLabelStyle())
-                            .opacity(0.85)
-                            .padding(.top, 4)
-                            Spacer(minLength: 2)
-                            Text(group.leaveText).font(Theme.rounded(13, .heavy))
-                            if let note = snap.station.note {
-                                Text(note).font(Theme.rounded(11, .semibold)).opacity(0.8)
-                            }
-                        }
-                        Spacer(minLength: 4)
-                        VStack(alignment: .trailing, spacing: 0) {
-                            BigMinutes(minutes: group.minutesToNext, size: 46, line: next.line)
-                            if let then = group.followingText {
-                                Text(then).font(Theme.rounded(13, .heavy)).opacity(0.85)
-                            }
-                        }
-                    }
-                }
-            } else {
-                EmptyCard(snap: snap)
+            TrainList(rows: snap.rows, spacing: 5) { row, first in
+                MediumRow(row: row, live: first)
             }
         }
     }
 }
 
-/// "8 min" with the live mark, Transit-style.
-private struct BigMinutes: View {
+private struct MediumRow: View {
     @Environment(\.widgetRenderingMode) private var mode
-    let minutes: Int
-    let size: CGFloat
-    let line: PathLine
+    let row: BoardSnapshot.Row
+    let live: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            Text("\(minutes)")
+        let paint = CardPaint(line: row.line, mode: mode)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(row.line.shortName)
+                .font(Theme.rounded(13, .black))
+                .lineLimit(1)
+                .layoutPriority(1)
+            HStack(spacing: 2) {
+                Image(systemName: "arrow.right").font(Theme.rounded(9, .black))
+                Text(row.line.towardsShort)
+            }
+            .font(Theme.rounded(12, .bold))
+            .opacity(0.85)
+            .lineLimit(1).minimumScaleFactor(0.75)
+            Spacer(minLength: 4)
+            Text(row.departure.date, style: .time)
+                .font(Theme.rounded(11, .semibold))
+                .opacity(0.8)
+                .lineLimit(1)
+                .fixedSize()
+            Minutes(value: row.minutes, size: 18)
+                .frame(minWidth: 52, alignment: .trailing)
+            // Space is reserved on every row so the minute column lines up.
+            RealtimeMark(color: paint.ink).frame(width: 9, height: 9)
+                .opacity(live ? 1 : 0)
+                .accessibilityHidden(!live)
+        }
+        .foregroundStyle(paint.ink)
+        .padding(.horizontal, 10)
+        .frame(height: 28)
+        .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 9))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(row.line.name) to \(row.line.towards) in \(row.minutes) minutes")
+    }
+}
+
+/// "8 min": the count is what the eye looks for; it takes the accent tint and
+/// shimmers while a refresh is in flight.
+private struct Minutes: View {
+    let value: Int
+    let size: CGFloat
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text("\(value)")
                 .font(Theme.rounded(size, .black))
                 .contentTransition(.numericText(countsDown: true))
                 .widgetAccentable()
                 .invalidatableContent()
-            Text("min").font(Theme.rounded(size * 0.3, .heavy))
-            RealtimeMark(color: CardPaint(line: line, mode: mode).ink)
-                .frame(width: size * 0.3, height: size * 0.3)
-                .padding(.leading, 2)
+            Text("min").font(Theme.rounded(size * 0.55, .heavy))
         }
         .lineLimit(1)
-        .minimumScaleFactor(0.6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(minutes) minutes, live")
+        .fixedSize()
     }
 }
 
-private struct CardTitle: View {
-    let line: PathLine
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(line.name)
-                .font(Theme.rounded(13, .black))
-                .lineLimit(1).minimumScaleFactor(0.7)
-            HStack(spacing: 3) {
-                Image(systemName: "arrow.right").font(Theme.rounded(10, .black))
-                Text(line.towards).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .font(Theme.rounded(12, .bold))
-            .opacity(0.85)
-        }
-    }
-}
-
-/// Newport small widget: one row per terminal.
-private struct CompactCard: View {
-    let group: BoardSnapshot.Group
-
-    @Environment(\.widgetRenderingMode) private var mode
-
-    var body: some View {
-        let paint = group.next.map { CardPaint(line: $0.line, mode: mode) }
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(group.destination.short)
-                .font(Theme.rounded(13, .black))
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Spacer(minLength: 2)
-            if group.next != nil {
-                Text("\(group.minutesToNext)")
-                    .font(Theme.rounded(24, .black))
-                    .contentTransition(.numericText(countsDown: true))
-                    .widgetAccentable()
-                    .invalidatableContent()
-                Text("min").font(Theme.rounded(10, .heavy))
-            } else {
-                Text("—").font(Theme.rounded(20, .black))
-            }
-        }
-        .foregroundStyle(paint?.ink ?? .secondary)
-        .padding(.horizontal, 9)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(paint?.fill ?? Color.secondary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
-/// Newport medium widget: one card per terminal, side by side.
-private struct TerminalCard: View {
-    let group: BoardSnapshot.Group
-
-    var body: some View {
-        if let next = group.next {
-            LineCard(line: next.line) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(next.line.name).font(Theme.rounded(12, .black)).lineLimit(1).minimumScaleFactor(0.7)
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.right").font(Theme.rounded(10, .black))
-                        Text(group.destination.short).lineLimit(1)
-                    }
-                    .font(Theme.rounded(12, .bold)).opacity(0.85)
-                    Spacer(minLength: 2)
-                    BigMinutes(minutes: group.minutesToNext, size: 34, line: next.line)
-                    Text(group.followingText ?? group.leaveText)
-                        .font(Theme.rounded(11, .heavy)).opacity(0.85).lineLimit(1)
-                }
-            }
-        } else {
-            EmptyCard(title: "No train to \(group.destination.short)", detail: "Not posted yet")
-        }
-    }
-}
-
-private struct LineCard<Content: View>: View {
-    @Environment(\.widgetRenderingMode) private var mode
-    let line: PathLine
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        let paint = CardPaint(line: line, mode: mode)
-        content
-            .foregroundStyle(paint.ink)
-            .padding(10)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background {
-                ZStack(alignment: .leading) {
-                    paint.fill
-                    if let accent = line.accent, paint.isFullColor { accent.frame(width: 5) }
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
-
-/// Card colors for the current rendering mode. In full color it's the line's
-/// own fill and ink. In tinted (accented) and lock screen (vibrant) modes iOS
-/// paints everything in one tint, so a solid fill would swallow its own text:
-/// use a translucent plate with light text instead.
+/// Row colors for the current rendering mode. In full color it's the line's own
+/// fill and ink. In tinted (accented) and lock screen (vibrant) modes iOS paints
+/// everything in one tint, so a solid fill would swallow its own text: use a
+/// translucent plate with light text instead.
 private struct CardPaint {
     let fill: Color
     let ink: Color
@@ -359,15 +312,23 @@ private struct CardPaint {
         fill = isFullColor ? line.color : Color.white.opacity(0.16)
         ink = isFullColor ? line.ink : .white
     }
+
 }
 
-/// Icon and title with a tight gap; the system label spacing is too loose at small sizes.
-private struct CompactLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon.font(Theme.rounded(10, .heavy))
-            configuration.title
+/// A row's fill, with a fixed-width stripe in the second color for combined
+/// overnight lines (full color only). Fixed width so it never reaches the text,
+/// however wide the row is.
+private struct RowBackground: View {
+    let paint: CardPaint
+    let accent: Color?
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            paint.fill
+            if paint.isFullColor, let accent { accent.frame(width: 4) }
         }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -386,79 +347,50 @@ private struct RefreshButton: View {
     }
 }
 
-/// Nothing catchable. Says why: either the train is too close to make on foot
-/// (Transit-style "just missed", so you can decide whether to run), or PATH
-/// hasn't posted the next one yet — it only lists about two trains ahead.
+/// PATH only posts about two trains per direction; between postings there can
+/// be nothing to list.
 private struct EmptyCard: View {
-    let title: String
-    let detail: String
-    var compact = false
-    /// The missed train's line, to tint the card so it still reads as that line.
-    var line: PathLine?
-
-    init(title: String, detail: String) {
-        self.title = title
-        self.detail = detail
-    }
-
-    /// `compact` is the small widget: about 16 characters a line, so the wording
-    /// is cut down rather than truncated.
-    init(snap: BoardSnapshot, compact: Bool = false) {
-        self.compact = compact
-        line = snap.justMissed?.line
-        let time = snap.justMissed?.date.formatted(date: .omitted, time: .shortened) ?? ""
-        let leaving = snap.minutesToMissed < 1
-        switch (snap.justMissed, compact) {
-        case (let missed?, true):
-            title = "Too late"
-            detail = "\(missed.line.name)\n\(time) · " + (leaving ? "leaving now" : "in \(snap.minutesToMissed) min")
-        case (let missed?, false):
-            title = "Too late for the \(missed.line.name)"
-            detail = "\(time) · " + (leaving ? "leaving now" : "leaves in \(snap.minutesToMissed) min")
-        case (nil, true):
-            title = "Not posted yet"
-            detail = snap.station.note ?? "PATH lists ~2 trains ahead"
-        case (nil, false):
-            title = "Next train not posted yet"
-            detail = snap.station.note ?? "PATH lists about 2 trains ahead"
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if !compact {
-                Image(systemName: "tram.fill")
-                    .font(Theme.rounded(16, .heavy))
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 2) {
             Spacer(minLength: 0)
-            Text(title).font(Theme.rounded(14, .heavy)).lineLimit(2).minimumScaleFactor(0.8)
-            Text(detail).font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary)
-                .lineLimit(2).minimumScaleFactor(0.85)
+            Text("No trains posted yet").font(Theme.rounded(13, .heavy))
+                .lineLimit(2).minimumScaleFactor(0.8)
+            Text("Tap ↻ to check again").font(Theme.rounded(11, .semibold)).foregroundStyle(.secondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background((line?.color ?? .secondary).opacity(line == nil ? 0.14 : 0.22),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
 private struct MessageView: View {
     let icon: String
     let text: String
+    /// For the inline lock screen slot, which fits ~20 characters.
+    let short: String
     let family: WidgetFamily
 
     var body: some View {
         switch family {
         case .accessoryInline:
-            Label(text, systemImage: icon)
+            Label(short, systemImage: icon)
         case .accessoryCircular:
-            Image(systemName: icon).font(.title2)
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: icon).font(.title3)
+            }
+        case .accessoryRectangular:
+            Label(text, systemImage: icon)
+                .font(Theme.rounded(13, .semibold))
+                .lineLimit(3).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
         default:
             VStack(alignment: .leading, spacing: 6) {
                 Image(systemName: icon).font(Theme.rounded(20, .heavy)).foregroundStyle(.orange)
                 Spacer(minLength: 0)
-                Text(text).font(Theme.rounded(13, .bold)).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(Theme.rounded(13, .bold))
+                    .lineLimit(4).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
@@ -471,21 +403,34 @@ private struct RectangularView: View {
     let snap: BoardSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 1) {
             Label("\(snap.walkMinutes) min · \(snap.station.shortName)", systemImage: "figure.walk")
                 .font(Theme.rounded(13, .semibold))
-                .lineLimit(1)
-            if snap.station.isHome {
-                ForEach(snap.groups, id: \.destination) { g in
-                    Text(g.next == nil ? "\(g.destination.short) —" : "\(g.destination.short) \(g.minutesToNext) min")
-                        .font(Theme.rounded(16, .heavy)).lineLimit(1)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            if snap.station.isHome, !snap.rows.isEmpty {
+                ForEach(snap.terminals.prefix(2), id: \.label) { t in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(t.label).font(Theme.rounded(13, .bold))
+                        Text(t.minutes.prefix(2).map(String.init).joined(separator: " · ") + " min")
+                            .font(Theme.rounded(17, .heavy))
+                            .widgetAccentable()
+                    }
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 }
-            } else if let g = snap.primary, let next = g.next {
-                Text("\(next.line.name) \(g.minutesToNext) min")
-                    .font(Theme.rounded(17, .heavy)).lineLimit(1).minimumScaleFactor(0.8)
-                Text(g.leaveText).font(Theme.rounded(13, .semibold))
+            } else if let first = snap.rows.first {
+                Text(first.label)
+                    .font(Theme.rounded(13, .bold))
+                    .lineLimit(1)
+                // As many departures as fit on one line.
+                ViewThatFits(in: .horizontal) {
+                    ForEach([3, 2, 1].filter { $0 <= snap.rows.count }, id: \.self) { n in
+                        Text(snap.minutesList(n) + " min")
+                    }
+                }
+                .font(Theme.rounded(18, .heavy))
+                .widgetAccentable()
             } else {
-                Text("No train listed").font(Theme.rounded(15, .heavy))
+                Text("No trains posted yet").font(Theme.rounded(15, .heavy))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -496,14 +441,17 @@ private struct InlineView: View {
     let snap: BoardSnapshot
 
     var body: some View {
-        if snap.station.isHome {
-            let parts = snap.groups.map { $0.next == nil ? "\($0.destination.short) –" : "\($0.destination.short) \($0.minutesToNext)" }
-            Label(parts.joined(separator: " · "), systemImage: "tram.fill")
-        } else if let g = snap.primary {
-            // The inline slot fits ~20 characters; the station and countdown matter most.
-            Label("\(g.minutesToNext) min · \(snap.station.shortName)", systemImage: "tram.fill")
+        // The inline slot fits ~20 characters; station and the next two counts.
+        if snap.rows.isEmpty {
+            Label("\(snap.station.shortName) · no trains", systemImage: "tram.fill")
+        } else if snap.station.isHome {
+            Label(snap.terminals.map { "\($0.label) \($0.minutes[0])" }.joined(separator: " · ") + " min",
+                  systemImage: "tram.fill")
         } else {
-            Label("\(snap.station.shortName) · no train", systemImage: "tram.fill")
+            ViewThatFits(in: .horizontal) {
+                Label("\(snap.station.shortName) \(snap.minutesList(2)) min", systemImage: "tram.fill")
+                Label("\(snap.station.shortName) \(snap.minutesList(1)) min", systemImage: "tram.fill")
+            }
         }
     }
 }
@@ -514,12 +462,14 @@ private struct CircularView: View {
     var body: some View {
         ZStack {
             AccessoryWidgetBackground()
-            if let g = snap.primary {
+            if let first = snap.rows.first {
                 VStack(spacing: -2) {
-                    Text("\(g.minutesToNext)").font(Theme.rounded(22, .black))
-                    Text(snap.station.isHome ? g.destination.short : "min")
-                        .font(Theme.rounded(9, .heavy)).lineLimit(1).minimumScaleFactor(0.6)
+                    Text("\(first.minutes)").font(Theme.rounded(22, .black)).widgetAccentable()
+                    Text(snap.station.isHome ? first.label : "min")
+                        .font(Theme.rounded(10, .bold))
+                        .lineLimit(1).minimumScaleFactor(0.6)
                 }
+                .padding(.horizontal, 4)
             } else {
                 Image(systemName: "tram.fill").font(.title3)
             }

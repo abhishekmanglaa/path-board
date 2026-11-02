@@ -14,44 +14,32 @@ enum TimelineBuilder {
     static let tickSlack: TimeInterval = 0.5
 
     /// Redraws are free, so place one exactly where any number on the board
-    /// changes: each catchable train's minute boundaries while it can still be
-    /// caught, plus the moment it stops being catchable and the card moves on.
-    /// Nothing ticks past the last catchable train or the horizon.
+    /// changes: each listed train's minute boundaries until it departs, plus the
+    /// moment it departs and drops off the list. Nothing past the horizon.
     static func redrawDates(for plan: Plan, from now: Date) -> [Date] {
         let end = now.addingTimeInterval(horizon)
         var dates: Set<Date> = [now]
-        for d in plan.catchable(at: now) {
-            let missed = plan.leaveBy(d).addingTimeInterval(1)
-            let until = min(missed, end)
+        for d in plan.upcoming(at: now) where d.date <= end {
             var t = d.date.addingTimeInterval(-60 * floor(d.date.timeIntervalSince(now) / 60) + tickSlack)
             if t <= now { t.addTimeInterval(60) }
-            while t < until {
+            while t < d.date {
                 dates.insert(t)
                 t.addTimeInterval(60)
             }
-            if missed <= end { dates.insert(missed) }
-        }
-        // A "just missed" train is named until it actually leaves.
-        for d in plan.departures where d.date > now && d.date <= end && plan.leaveBy(d) < now {
-            dates.insert(d.date.addingTimeInterval(1))
+            dates.insert(d.date.addingTimeInterval(tickSlack))
         }
         return dates.sorted()
     }
 
-    /// Refetch before the board would run out of catchable trains, but no sooner
-    /// than `minReloadInterval` (a reload spent early is one missing later).
+    /// Refetch as the list starts running dry (PATH only posts a couple of trains
+    /// ahead per direction), but no sooner than `minReloadInterval` — a reload
+    /// spent early is one missing later.
     static func reloadDate(for plan: Plan, from now: Date) -> Date {
-        let catchable = plan.catchable(at: now)
-        // Nothing left to count down to: refetch as soon as the floor allows.
-        if catchable.isEmpty { return now.addingTimeInterval(minReloadInterval) }
-        var target = now.addingTimeInterval(maxReloadInterval)
-        // When only one catchable train remains, refetch as the one before the
-        // last becomes uncatchable, so there's still something to show meanwhile.
-        if catchable.count >= 2 {
-            target = min(target, plan.leaveBy(catchable[catchable.count - 2]))
-        } else {
-            target = min(target, plan.leaveBy(catchable[0]))
-        }
+        let upcoming = plan.upcoming(at: now)
+        guard !upcoming.isEmpty else { return now.addingTimeInterval(minReloadInterval) }
+        // When the second-to-last listed train leaves, only one remains: fetch more.
+        let runningDry = upcoming[max(0, upcoming.count - 2)].date
+        let target = min(now.addingTimeInterval(maxReloadInterval), runningDry)
         return max(target, now.addingTimeInterval(minReloadInterval))
     }
 }

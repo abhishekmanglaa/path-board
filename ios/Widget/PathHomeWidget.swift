@@ -66,7 +66,7 @@ struct PathHomeWidget: Widget {
             PathHomeWidgetView(entry: entry)
         }
         .configurationDisplayName("Train Home")
-        .description("Nearest PATH station, the walk there, and the next train to Newport.")
+        .description("Walk time to the nearest PATH station and its next trains home.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline, .accessoryCircular])
     }
 }

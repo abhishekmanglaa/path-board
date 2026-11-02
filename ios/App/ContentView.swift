@@ -92,33 +92,14 @@ private struct Departures: View {
                 Label("\(snap.walkMinutes) min walk", systemImage: "figure.walk")
                     .font(Theme.rounded(16, .heavy)).foregroundStyle(Theme.walk)
             }
-            ForEach(plan.groups(at: now), id: \.destination) { group in
-                if plan.station.isHome {
-                    Text("TO \(group.destination.label.uppercased())")
-                        .font(Theme.rounded(12, .heavy)).foregroundStyle(.secondary)
-                        .padding(.top, 6)
-                }
-                if group.trains.isEmpty {
-                    if let missed = plan.justMissed(at: now), group.destination.includes(missed) {
-                        // Too close to walk to, but still worth knowing about: you might run.
-                        TrainRow(plan: plan, train: missed, now: now)
-                            .opacity(0.45)
-                            .overlay(alignment: .topTrailing) {
-                                Text("TOO LATE")
-                                    .font(Theme.rounded(11, .black))
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(.black.opacity(0.75), in: Capsule())
-                                    .foregroundStyle(.white)
-                                    .padding(10)
-                            }
-                    }
-                    Text("Next train not posted yet. PATH lists about two trains ahead."
-                         + (plan.station.note.map { " \($0)." } ?? ""))
-                        .font(Theme.rounded(15, .semibold)).foregroundStyle(.secondary)
-                }
-                ForEach(group.trains, id: \.self) { train in
-                    TrainRow(plan: plan, train: train, now: now)
-                }
+            let trains = plan.rows(at: now)
+            if trains.isEmpty {
+                Text("No trains posted yet. PATH lists about two trains ahead per direction."
+                     + (plan.station.note.map { " \($0)." } ?? ""))
+                    .font(Theme.rounded(15, .semibold)).foregroundStyle(.secondary)
+            }
+            ForEach(trains, id: \.self) { train in
+                TrainRow(train: train, now: now)
             }
             Text("Updated \(plan.computedAt, style: .relative) ago")
                 .font(Theme.rounded(12, .medium)).foregroundStyle(.tertiary)
@@ -127,21 +108,18 @@ private struct Departures: View {
 }
 
 private struct TrainRow: View {
-    let plan: Plan
     let train: Departure
     let now: Date
 
     var body: some View {
         let line = train.line
-        let minutes = Int(train.date.timeIntervalSince(now) / 60)
-        let leaveIn = plan.leaveBy(train).timeIntervalSince(now)
-        let leave = Int(leaveIn / 60)
+        let minutes = BoardSnapshot.minutes(from: now, to: train.date)
         let time = train.date.formatted(date: .omitted, time: .shortened)
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(line.name).font(Theme.rounded(17, .black))
                 Label(line.towards, systemImage: "arrow.right").font(Theme.rounded(14, .bold)).opacity(0.85)
-                Text(leaveIn < 0 ? "Departs \(time)" : leave < 1 ? "Leave now · \(time)" : "Leave in \(leave) min · \(time)")
+                Text("Departs \(time)")
                     .font(Theme.rounded(13, .heavy)).opacity(0.85)
             }
             Spacer()

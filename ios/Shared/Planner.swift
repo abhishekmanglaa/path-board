@@ -26,32 +26,24 @@ struct Plan: Codable {
 
     var station: Station { Station.byID[stationID] ?? Station.byID[Station.homeID]! }
 
-    /// The walk as shown, rounded up so it errs toward making the train. All the
-    /// board's math uses this, so "3 min walk", "train in 8" and "leave in 5" add up.
+    /// The walk as shown, rounded up so it never understates how far it is.
     var walkMinutes: Int { max(1, Int((walkSeconds / 60).rounded(.up))) }
 
-    /// Trains you can still reach on foot at `now`.
-    func catchable(at now: Date) -> [Departure] {
-        departures.filter { leaveBy($0) >= now }
+    /// Trains that haven't left yet, soonest first.
+    func upcoming(at now: Date) -> [Departure] {
+        departures.filter { $0.date > now }
     }
 
-    /// Catchable trains split by where they're headed (one group away from home,
-    /// WTC and 33rd St at Newport). Groups with nothing listed are kept so the
-    /// board layout doesn't jump around.
-    func groups(at now: Date) -> [(destination: Destination, trains: [Departure])] {
-        let trains = catchable(at: now)
-        return station.destinations.map { dest in (dest, trains.filter(dest.includes)) }
-    }
-
-    /// The latest train that's still coming but you can no longer reach on foot —
-    /// what a "just missed" note should name when nothing is catchable.
-    func justMissed(at now: Date) -> Departure? {
-        departures.last { $0.date > now && leaveBy($0) < now }
-    }
-
-    /// The moment you have to start walking to make `departure`.
-    func leaveBy(_ departure: Departure) -> Date {
-        departure.date.addingTimeInterval(-Double(walkMinutes) * 60)
+    /// The trains to list, in display order. Away from home that's simply the
+    /// soonest. At Newport the next train to each terminal leads (WTC and 33rd St,
+    /// like RidePATH), then the rest by time — so cutting the list to fewer rows
+    /// never drops a destination.
+    func rows(at now: Date) -> [Departure] {
+        let trains = upcoming(at: now)
+        guard station.isHome else { return trains }
+        let leaders = station.destinations.compactMap { dest in trains.first(where: dest.includes) }
+            .sorted { $0.date < $1.date }
+        return leaders + trains.filter { !leaders.contains($0) }
     }
 }
 
