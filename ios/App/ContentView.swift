@@ -10,7 +10,11 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !monitor.hasAlways { AccessBanner(monitor: monitor) }
-                    if let plan = monitor.plan {
+                    if monitor.isFarAway {
+                        Label(PlanError.farFromPATH.localizedDescription, systemImage: "map")
+                            .font(Theme.rounded(20, .heavy))
+                            .padding(.top, 40)
+                    } else if let plan = monitor.plan {
                         // Redraw every second so minutes tick here the way they do on the widget.
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             Departures(plan: plan, now: context.date, showing: newportDestinations)
@@ -137,10 +141,13 @@ private struct Departures: View {
                 Text(plan.station.name).font(Theme.rounded(30, .black))
                 Label("\(snap.walkMinutes) min walk", systemImage: "figure.walk")
                     .font(Theme.rounded(16, .heavy)).foregroundStyle(Theme.walk)
+                if let note = plan.station.note {
+                    Label(note, systemImage: "arrow.triangle.swap")
+                        .font(Theme.rounded(16, .heavy)).foregroundStyle(.orange)
+                }
             }
             if snap.rows.isEmpty {
-                Text("No trains posted yet. PATH lists about two trains ahead per direction."
-                     + (plan.station.note.map { " \($0)." } ?? ""))
+                Text("No trains posted yet. PATH lists about two trains ahead per direction.")
                     .font(Theme.rounded(15, .semibold)).foregroundStyle(.secondary)
             }
             ForEach(snap.rows) { row in

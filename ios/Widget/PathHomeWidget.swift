@@ -36,6 +36,9 @@ struct Provider: TimelineProvider {
             let entries = TimelineBuilder.redrawDates(for: plan, from: now)
                 .map { BoardEntry(date: $0, state: .plan(plan)) }
             return Timeline(entries: entries, policy: .after(TimelineBuilder.reloadDate(for: plan, from: now)))
+        } catch PlanError.farFromPATH {
+            return Timeline(entries: [BoardEntry(date: now, state: .farAway)],
+                            policy: .after(now.addingTimeInterval(TimelineBuilder.maxReloadInterval)))
         } catch {
             let stale = SharedStore.lastPlan
             let entries = stale.map { plan in

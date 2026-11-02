@@ -16,6 +16,8 @@ final class LocationMonitor: NSObject, ObservableObject {
     @Published private(set) var authorization: CLAuthorizationStatus
     @Published private(set) var plan: Plan?
     @Published private(set) var error: String?
+    /// The last fix was nowhere near PATH.
+    @Published private(set) var isFarAway = false
     @Published private(set) var isRefreshing = false
     private var isFollowing = false
     /// The next plan refetches trains even if a fresh one exists for this spot.
@@ -83,7 +85,16 @@ final class LocationMonitor: NSObject, ObservableObject {
     private func startBackgroundMonitoringIfAllowed() {
         guard hasAlways else { return }
         manager.startMonitoringSignificantLocationChanges()
-        let monitored = Set(manager.monitoredRegions.map(\.identifier))
+        // Regions persist across launches; replace any whose station has moved.
+        var monitored: Set<String> = []
+        for case let region as CLCircularRegion in manager.monitoredRegions {
+            if let station = Station.byID[region.identifier],
+               region.center.latitude == station.latitude, region.center.longitude == station.longitude {
+                monitored.insert(region.identifier)
+            } else {
+                manager.stopMonitoring(for: region)
+            }
+        }
         for station in Station.all where !monitored.contains(station.id) {
             let region = CLCircularRegion(center: station.coordinate, radius: Self.stationRadius, identifier: station.id)
             region.notifyOnEntry = true
@@ -107,6 +118,10 @@ final class LocationMonitor: NSObject, ObservableObject {
             let plan = try await Planner.plan(from: location, forceFresh: force)
             SharedStore.lastPlan = plan
             self.plan = plan
+            error = nil
+            isFarAway = false
+        } catch PlanError.farFromPATH {
+            isFarAway = true
             error = nil
         } catch {
             self.error = error.localizedDescription

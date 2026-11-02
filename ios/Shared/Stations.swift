@@ -68,18 +68,20 @@ extension Station {
     //   HOB–WTC: Hoboken · Newport · Exchange Pl · WTC
     //   JSQ–33:  Journal Sq · Grove · Newport · Christopher … 33rd
     // Overnight JSQ–33 runs via Hoboken; its headsign still contains "journal".
+    // Coordinates are where Apple Maps puts each station, so walks route to the
+    // entrance rather than to a point it can only reach the long way round.
     static let all: [Station] = [
-        Station(id: "NWK", name: "Newark", latitude: 40.7347, longitude: -74.1644,
+        Station(id: "NWK", name: "Newark", latitude: 40.7340, longitude: -74.1645,
                 shownHeadsigns: ["world trade"], note: "Change at Journal Sq"),
         Station(id: "HAR", name: "Harrison", latitude: 40.7393, longitude: -74.1558,
                 shownHeadsigns: ["world trade"], note: "Change at Journal Sq"),
-        Station(id: "JSQ", name: "Journal Square", latitude: 40.7331, longitude: -74.0628,
+        Station(id: "JSQ", name: "Journal Square", latitude: 40.7323, longitude: -74.0629,
                 shownHeadsigns: ["33rd"], note: nil),
-        Station(id: "GRV", name: "Grove Street", latitude: 40.7197, longitude: -74.0429,
+        Station(id: "GRV", name: "Grove Street", latitude: 40.7192, longitude: -74.0420,
                 shownHeadsigns: ["33rd"], note: nil),
-        Station(id: "NEW", name: "Newport", latitude: 40.7270, longitude: -74.0337,
+        Station(id: "NEW", name: "Newport", latitude: 40.7268, longitude: -74.0348,
                 shownHeadsigns: ["world trade", "33rd", "journal", "hoboken"], note: nil),
-        Station(id: "EXP", name: "Exchange Place", latitude: 40.7163, longitude: -74.0328,
+        Station(id: "EXP", name: "Exchange Place", latitude: 40.7168, longitude: -74.0324,
                 shownHeadsigns: ["hoboken"], note: nil),
         Station(id: "HOB", name: "Hoboken", latitude: 40.7353, longitude: -74.0291,
                 shownHeadsigns: ["world trade", "journal"], note: nil),

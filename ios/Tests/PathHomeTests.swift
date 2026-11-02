@@ -353,6 +353,33 @@ final class HomeAndLinkTests: XCTestCase {
         XCTAssertEqual(Set(Planner.candidates(near: between).map(\.id)), ["NEW", "EXP"])
     }
 
+    /// Newport is always routed when walkable, and wins near-ties: between Newport
+    /// and Exchange Place you walk home rather than to a train back to it.
+    func testWalkingHomeBeatsATrainBackHome() {
+        let nearHoboken = CLLocation(latitude: 40.7356, longitude: -74.0297)
+        XCTAssertTrue(Planner.candidates(near: nearHoboken).map(\.id).contains("NEW"))
+        let (exp, new, hob) = (Station.byID["EXP"]!, Station.byID["NEW"]!, Station.byID["HOB"]!)
+        XCTAssertEqual(Planner.choose([(exp, 600), (new, 660)])?.0.id, "NEW")
+        // MapKit's walks from between the two (40.7216, -74.0334): 9:24 vs 13:10.
+        XCTAssertEqual(Planner.choose([(exp, 564), (new, 790)])?.0.id, "NEW")
+        XCTAssertEqual(Planner.choose([(exp, 60), (new, 480)])?.0.id, "EXP")
+        XCTAssertEqual(Planner.choose([(hob, 120), (new, 780)])?.0.id, "HOB")
+        XCTAssertNil(Planner.choose([]))
+    }
+
+    func testFarFromPATHIsNotAWalk() async {
+        XCTAssertTrue(Planner.isNearPATH(CLLocation(latitude: 40.7527, longitude: -73.9772)))   // Grand Central
+        XCTAssertFalse(Planner.isNearPATH(CLLocation(latitude: 40.6782, longitude: -73.9442)))  // Brooklyn
+        let sf = CLLocation(latitude: 37.7749, longitude: -122.4194)
+        do {
+            _ = try await Planner.plan(from: sf, previous: nil)
+            XCTFail("planned a walk from San Francisco")
+        } catch {
+            XCTAssertEqual(error as? PlanError, .farFromPATH)
+        }
+        XCTAssertEqual(BoardEntry(date: now, state: .farAway).deepLink.absoluteString, "pathhome://open")
+    }
+
     func testFreshPlanFromSameSpotIsReusedWithoutNetwork() async throws {
         let previous = Plan.sample(at: now)
         let nearby = CLLocation(latitude: previous.originLatitude + 0.0003, longitude: previous.originLongitude)

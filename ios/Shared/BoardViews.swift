@@ -4,6 +4,8 @@ import WidgetKit
 enum BoardState {
     case plan(Plan)
     case needsLocation
+    /// Nowhere near PATH; there's no station to walk to.
+    case farAway
     /// A refresh failed; show the last good plan if we have one.
     case failed(message: String, stale: Plan?)
 }
@@ -101,18 +103,23 @@ extension Station {
 struct BoardView: View {
     let entry: BoardEntry
     let family: WidgetFamily
+    /// Which directions to list at Newport; the app's setting unless given.
+    var showing: [Destination] = SharedStore.newportDestinations
 
     var body: some View {
         switch entry.state {
         case .plan(let plan):
-            PlanView(snap: BoardSnapshot(plan: plan, at: entry.date), family: family, stale: false)
+            PlanView(snap: BoardSnapshot(plan: plan, at: entry.date, showing: showing), family: family, stale: false)
         case .failed(_, let stale?):
-            PlanView(snap: BoardSnapshot(plan: stale, at: entry.date), family: family, stale: true)
+            PlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing), family: family, stale: true)
         case .failed(let message, nil):
             MessageView(icon: "exclamationmark.triangle.fill", text: message, short: "Trains unavailable", family: family)
         case .needsLocation:
             MessageView(icon: "location.slash.fill", text: "Open PATH Home to share your location",
                         short: "Open app for location", family: family)
+        case .farAway:
+            MessageView(icon: "map", text: PlanError.farFromPATH.localizedDescription,
+                        short: "No PATH nearby", family: family)
         }
     }
 }
@@ -248,7 +255,7 @@ private struct MediumView: View {
                 RefreshButton()
             }
             TrainList(rows: snap.rows, spacing: 5, height: 28) { row, height in
-                MediumRow(row: row, home: snap.station.isHome, height: height)
+                MediumRow(row: row, home: snap.station.isHome, note: snap.station.note, height: height)
             }
         }
     }
@@ -258,6 +265,8 @@ private struct MediumRow: View {
     @Environment(\.widgetRenderingMode) private var mode
     let row: BoardSnapshot.Row
     let home: Bool
+    /// "Change at Journal Sq" where no train runs straight to Newport.
+    let note: String?
     let height: CGFloat
 
     var body: some View {
@@ -268,10 +277,12 @@ private struct MediumRow: View {
                 .lineLimit(1)
                 .layoutPriority(2)
             // At Newport the row is the terminal, so name the line; elsewhere the
-            // row is the line, so name where it's headed.
+            // row is the line, so name where it's headed, or where to change.
             Group {
                 if home {
                     Text(row.line.shortName)
+                } else if let note {
+                    Text(note)
                 } else {
                     HStack(spacing: 2) {
                         Image(systemName: "arrow.right").font(Theme.rounded(9, .black))

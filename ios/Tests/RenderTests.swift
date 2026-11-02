@@ -39,13 +39,16 @@ final class RenderTests: XCTestCase {
                                                                                 colors: "65C100", headsign: "World Trade Center"))),
             ("needs-location", .needsLocation),
             ("failed", .failed(message: "Couldn't load trains", stale: nil)),
+            ("far-away", .farAway),
+            ("newark-change", .plan(.sample(at: now, stationID: "NWK", walkMinutes: 2, minutes: [6, 21],
+                                            colors: "D93A30", headsign: "World Trade Center"))),
         ]
     }
 
-    private func tile(_ state: BoardState, _ family: WidgetFamily, _ size: CGSize, _ mode: Mode) -> some View {
+    private func tile(_ state: BoardState, _ showing: [Destination], _ family: WidgetFamily, _ size: CGSize, _ mode: Mode) -> some View {
         let lock = [.accessoryInline, .accessoryCircular, .accessoryRectangular].contains(family)
         let rendering: WidgetRenderingMode = lock ? .vibrant : (mode == .tinted ? .accented : .fullColor)
-        return BoardView(entry: BoardEntry(date: now, state: state), family: family)
+        return BoardView(entry: BoardEntry(date: now, state: state), family: family, showing: showing)
             .environment(\.widgetRenderingMode, rendering)
             .environment(\.colorScheme, mode == .light && !lock ? .light : .dark)
             .padding(lock ? 0 : 16)  // WidgetKit's default content margins
@@ -58,19 +61,19 @@ final class RenderTests: XCTestCase {
             .clipShape(RoundedRectangle(cornerRadius: lock ? 12 : 22, style: .continuous))
     }
 
-    private func sheet(_ state: BoardState) -> some View {
+    private func sheet(_ state: BoardState, _ showing: [Destination]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(Mode.allCases, id: \.self) { mode in
                 HStack(alignment: .top, spacing: 14) {
-                    ForEach(Self.small, id: \.self) { s in self.tile(state, .systemSmall, CGSize(width: s, height: s), mode) }
-                    ForEach(Self.medium, id: \.width) { s in self.tile(state, .systemMedium, s, mode) }
+                    ForEach(Self.small, id: \.self) { s in self.tile(state, showing, .systemSmall, CGSize(width: s, height: s), mode) }
+                    ForEach(Self.medium, id: \.width) { s in self.tile(state, showing, .systemMedium, s, mode) }
                 }
             }
             HStack(alignment: .top, spacing: 14) {
-                tile(state, .accessoryRectangular, CGSize(width: 158, height: 72), .dark)
-                tile(state, .accessoryRectangular, CGSize(width: 172, height: 76), .dark)
-                tile(state, .accessoryCircular, CGSize(width: 72, height: 72), .dark)
-                tile(state, .accessoryInline, CGSize(width: 230, height: 22), .dark)
+                tile(state, showing, .accessoryRectangular, CGSize(width: 158, height: 72), .dark)
+                tile(state, showing, .accessoryRectangular, CGSize(width: 172, height: 76), .dark)
+                tile(state, showing, .accessoryCircular, CGSize(width: 72, height: 72), .dark)
+                tile(state, showing, .accessoryInline, CGSize(width: 230, height: 22), .dark)
             }
         }
         .padding(20)
@@ -78,13 +81,13 @@ final class RenderTests: XCTestCase {
     }
 
     /// Train Rings: small and medium, full color and tinted.
-    private func glassSheet(_ state: BoardState) -> some View {
+    private func glassSheet(_ state: BoardState, _ showing: [Destination]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach([true, false], id: \.self) { full in
                 let rendering: WidgetRenderingMode = full ? .fullColor : .accented
                 HStack(alignment: .top, spacing: 14) {
-                    ForEach(Self.small, id: \.self) { s in self.glassTile(state, .systemSmall, CGSize(width: s, height: s), rendering) }
-                    ForEach(Self.medium, id: \.width) { s in self.glassTile(state, .systemMedium, s, rendering) }
+                    ForEach(Self.small, id: \.self) { s in self.glassTile(state, showing, .systemSmall, CGSize(width: s, height: s), rendering) }
+                    ForEach(Self.medium, id: \.width) { s in self.glassTile(state, showing, .systemMedium, s, rendering) }
                 }
             }
         }
@@ -93,8 +96,9 @@ final class RenderTests: XCTestCase {
                                    startPoint: .top, endPoint: .bottom))
     }
 
-    private func glassTile(_ state: BoardState, _ family: WidgetFamily, _ size: CGSize, _ rendering: WidgetRenderingMode) -> some View {
-        GlassBoardView(entry: BoardEntry(date: now, state: state), family: family)
+    private func glassTile(_ state: BoardState, _ showing: [Destination], _ family: WidgetFamily, _ size: CGSize,
+                           _ rendering: WidgetRenderingMode) -> some View {
+        GlassBoardView(entry: BoardEntry(date: now, state: state), family: family, showing: showing)
             .environment(\.widgetRenderingMode, rendering)
             .environment(\.colorScheme, .dark)
             .padding(16)
@@ -108,19 +112,17 @@ final class RenderTests: XCTestCase {
             throw XCTSkip("set TEST_RUNNER_RENDER_DIR to render contact sheets")
         }
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let saved = SharedStore.newportDestinationIDs
-        defer { SharedStore.newportDestinationIDs = saved }
         let home = scenarios().first { $0.0 == "home" }!.1
         var all: [(String, BoardState, [String])] = scenarios().map { ($0.0, $0.1, Destination.defaultNewportIDs) }
         all.append(("home-all-four", home, Destination.newport.map(\.id)))
         all.append(("home-wtc-only", home, ["WTC"]))
         for (name, state, ids) in all {
-            SharedStore.newportDestinationIDs = ids
-            let renderer = ImageRenderer(content: sheet(state))
+            let showing = Destination.newport.filter { ids.contains($0.id) }
+            let renderer = ImageRenderer(content: sheet(state, showing))
             renderer.scale = 2
             let data = try XCTUnwrap(renderer.uiImage?.pngData(), name)
             try data.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
-            let glass = ImageRenderer(content: glassSheet(state))
+            let glass = ImageRenderer(content: glassSheet(state, showing))
             glass.scale = 2
             try XCTUnwrap(glass.uiImage?.pngData(), name)
                 .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name)-glass.png"))

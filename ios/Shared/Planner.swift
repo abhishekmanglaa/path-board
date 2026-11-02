@@ -51,10 +51,17 @@ struct Plan: Codable {
     }
 }
 
-enum PlanError: LocalizedError {
+enum PlanError: LocalizedError, Equatable {
     case feedUnavailable
+    /// Nowhere near PATH: no station is a sensible walk away.
+    case farFromPATH
 
-    var errorDescription: String? { "Couldn't load trains" }
+    var errorDescription: String? {
+        switch self {
+        case .feedUnavailable: return "Couldn't load trains"
+        case .farFromPATH: return "No PATH station within walking distance"
+        }
+    }
 }
 
 enum Planner {
@@ -70,6 +77,7 @@ enum Planner {
     /// walk when you haven't moved.
     static func plan(from here: CLLocation, previous: Plan? = SharedStore.lastPlan, now: Date = Date(),
                      forceFresh: Bool = false) async throws -> Plan {
+        guard isNearPATH(here) else { throw PlanError.farFromPATH }
         let sameSpot = previous.map { $0.origin.distance(from: here) < sameSpotMeters } ?? false
         if let previous, sameSpot, !forceFresh, now.timeIntervalSince(previous.computedAt) < reuseWindow {
             return previous
@@ -106,13 +114,39 @@ enum Planner {
         return (live + scheduled).sorted { $0.date < $1.date }
     }
 
+    /// Farther than this from every station (about an hour's walk), there's no
+    /// sensible station to show.
+    static let walkableMeters: CLLocationDistance = 4000
+    /// Newport is in reach on foot from this far; walking home may beat a train.
+    static let homeWalkMeters: CLLocationDistance = 1500
+    /// Walking to Newport wins unless another station saves at least this much walk,
+    /// roughly the wait plus the one-stop ride back to Newport it would cost:
+    /// between Newport and Exchange Place you walk home, not to a train back to it.
+    static let homeBias: TimeInterval = 6 * 60
+
+    static func isNearPATH(_ here: CLLocation) -> Bool {
+        Station.all.contains { $0.location.distance(from: here) <= walkableMeters }
+    }
+
     /// The closest station by straight line, unless the runner-up is close enough
     /// to plausibly be a shorter walk (the river and rail yards make "closest" and
-    /// "quickest" differ) — then both get routed and the shorter walk wins.
+    /// "quickest" differ) — then both get routed and the shorter walk wins. Newport
+    /// is routed too whenever it's walkable.
     static func candidates(near here: CLLocation) -> [Station] {
         let ranked = Station.all.sorted { $0.location.distance(from: here) < $1.location.distance(from: here) }
         let (d0, d1) = (ranked[0].location.distance(from: here), ranked[1].location.distance(from: here))
-        return d1 < d0 * 1.5 + 150 ? [ranked[0], ranked[1]] : [ranked[0]]
+        var out = d1 < d0 * 1.5 + 150 ? [ranked[0], ranked[1]] : [ranked[0]]
+        let home = Station.byID[Station.homeID]!
+        if !out.contains(home), home.location.distance(from: here) <= homeWalkMeters { out.append(home) }
+        return out
+    }
+
+    /// The shortest walk, except that Newport keeps the tie unless another
+    /// station is `homeBias` closer.
+    static func choose(_ walks: [(Station, TimeInterval)]) -> (Station, TimeInterval)? {
+        guard let best = walks.min(by: { $0.1 < $1.1 }) else { return nil }
+        if let home = walks.first(where: { $0.0.isHome }), home.1 <= best.1 + homeBias { return home }
+        return best
     }
 
     private static func nearestByWalk(from here: CLLocation) async -> (Station, TimeInterval) {
@@ -125,7 +159,7 @@ enum Planner {
             for await result in group { out.append(result) }
             return out
         }
-        return walks.min { $0.1 < $1.1 } ?? (options[0], fallbackWalk(from: here, to: options[0]))
+        return choose(walks) ?? (options[0], fallbackWalk(from: here, to: options[0]))
     }
 
     /// Apple Maps walking ETA; straight-line estimate if MapKit can't route.

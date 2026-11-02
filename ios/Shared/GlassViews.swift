@@ -7,17 +7,21 @@ import WidgetKit
 struct GlassBoardView: View {
     let entry: BoardEntry
     let family: WidgetFamily
+    /// Which directions to list at Newport; the app's setting unless given.
+    var showing: [Destination] = SharedStore.newportDestinations
 
     var body: some View {
         switch entry.state {
         case .plan(let plan):
-            GlassPlanView(snap: BoardSnapshot(plan: plan, at: entry.date), family: family, stale: false)
+            GlassPlanView(snap: BoardSnapshot(plan: plan, at: entry.date, showing: showing), family: family, stale: false)
         case .failed(_, let stale?):
-            GlassPlanView(snap: BoardSnapshot(plan: stale, at: entry.date), family: family, stale: true)
+            GlassPlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing), family: family, stale: true)
         case .failed:
             GlassMessage(icon: "exclamationmark.triangle.fill", text: "Trains unavailable")
         case .needsLocation:
             GlassMessage(icon: "location.slash.fill", text: "Open PATH Home to share your location")
+        case .farAway:
+            GlassMessage(icon: "map", text: PlanError.farFromPATH.localizedDescription)
         }
     }
 }

@@ -15,8 +15,10 @@ struct RefreshTrainsIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let manager = CLLocationManager()
         let fix = manager.isAuthorizedForWidgetUpdates ? manager.location : nil
-        if let here = SharedStore.freshestLocation(fix) {
-            SharedStore.lastPlan = try? await Planner.plan(from: here, forceFresh: true)
+        // Only a success replaces the saved plan: a failed refresh must leave the
+        // last good one for the widget to fall back on.
+        if let here = SharedStore.freshestLocation(fix), let plan = try? await Planner.plan(from: here, forceFresh: true) {
+            SharedStore.lastPlan = plan
         }
         return .result()
     }
