@@ -45,7 +45,6 @@ xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*\(connected\|availa
 
 # Removing the cached profiles makes Xcode request new 7-day ones. Build from
 # scratch too: an earlier build would still point at the removed files.
-rm -rf "$BUILD_DIR"
 backup=$(mktemp -d)
 for f in $ours; do mv "$f" "$backup/"; done
 # However this run ends, put back any old profile Xcode didn't replace, so a
@@ -61,8 +60,14 @@ restore() {
 }
 trap restore EXIT
 
-xcodebuild -project "$IOS_DIR/PathHome.xcodeproj" -scheme PathHome -configuration Debug \
-    -destination "id=$DEVICE" -derivedDataPath "$BUILD_DIR" -allowProvisioningUpdates build -quiet || fail "build failed"
+build() {
+    rm -rf "$BUILD_DIR"
+    xcodebuild -project "$IOS_DIR/PathHome.xcodeproj" -scheme PathHome -configuration Debug \
+        -destination "id=$DEVICE" -derivedDataPath "$BUILD_DIR" -allowProvisioningUpdates build -quiet
+}
+# Right after another renewal Xcode can still point at the profile just moved
+# aside; it forgets within a minute or so, so one delayed retry covers it.
+build || { echo "retrying in 90s"; sleep 90; build; } || fail "build failed"
 
 app=$BUILD_DIR/Build/Products/Debug-iphoneos/PathHome.app
 xcrun devicectl device install app --device "$DEVICE" "$app" || fail "install failed"
