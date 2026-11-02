@@ -6,8 +6,23 @@ struct Departure: Codable, Hashable {
     let headsign: String
     /// Raw feed value: one hex color, or two ("4D92FB,FF9900") for a combined line.
     let lineColors: String
+    /// From Newport's timetable rather than posted by PATH.
+    var scheduled = false
 
     var line: PathLine { PathLine(feedColors: lineColors, headsign: headsign) }
+}
+
+extension Departure {
+    private enum CodingKeys: String, CodingKey { case date, headsign, lineColors, scheduled }
+
+    /// Plans saved before `scheduled` existed still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decode(Date.self, forKey: .date)
+        headsign = try c.decode(String.self, forKey: .headsign)
+        lineColors = try c.decode(String.self, forKey: .lineColors)
+        scheduled = try c.decodeIfPresent(Bool.self, forKey: .scheduled) ?? false
+    }
 }
 
 /// Everything the widget and app show: where to go, how long the walk is,
@@ -15,7 +30,8 @@ struct Departure: Codable, Hashable {
 struct Plan: Codable {
     let stationID: String
     let walkSeconds: TimeInterval
-    /// All trains worth showing from the station, soonest first, including ones you can't reach.
+    /// All trains worth showing from the station, soonest first: the ones PATH has
+    /// posted and, at Newport, the timetabled ones after them.
     let departures: [Departure]
     let computedAt: Date
     /// Where the walk was measured from, so a nearby later fix can reuse it.
@@ -32,18 +48,6 @@ struct Plan: Codable {
     /// Trains that haven't left yet, soonest first.
     func upcoming(at now: Date) -> [Departure] {
         departures.filter { $0.date > now }
-    }
-
-    /// The trains to list, in display order. Away from home that's simply the
-    /// soonest. At Newport the next train to each terminal leads (WTC and 33rd St,
-    /// like RidePATH), then the rest by time — so cutting the list to fewer rows
-    /// never drops a destination.
-    func rows(at now: Date) -> [Departure] {
-        let trains = upcoming(at: now)
-        guard station.isHome else { return trains }
-        let leaders = station.destinations.compactMap { dest in trains.first(where: dest.includes) }
-            .sorted { $0.date < $1.date }
-        return leaders + trains.filter { !leaders.contains($0) }
     }
 }
 
@@ -79,10 +83,27 @@ enum Planner {
         } else {
             (station, walk) = await nearestByWalk(from: here)
         }
+        let fetched = try await feed
         return Plan(stationID: station.id, walkSeconds: walk,
-                    departures: try await feed.departures(from: station),
+                    departures: withTimetable(fetched.departures(from: station), at: station, now: fetched.fetchedAt),
                     computedAt: Date(), originLatitude: here.coordinate.latitude,
                     originLongitude: here.coordinate.longitude)
+    }
+
+    /// At Newport, PATH posts about one train per direction; the timetable fills in
+    /// the ones after it. Other stations have no timetable and show only live trains.
+    static func withTimetable(_ live: [Departure], at station: Station, now: Date) -> [Departure] {
+        guard station.isHome else { return live }
+        let scheduled = station.destinations.flatMap { dest -> [Departure] in
+            let posted = live.filter(dest.includes)
+            // Scheduled trains look like the posted one (it may be the overnight via-Hoboken run).
+            let like = posted.last
+            return NewportSchedule.projected(dest.id, after: posted.map(\.date), now: now).map {
+                Departure(date: $0, headsign: like?.headsign ?? dest.headsign,
+                          lineColors: like?.lineColors ?? dest.lineColors, scheduled: true)
+            }
+        }
+        return (live + scheduled).sorted { $0.date < $1.date }
     }
 
     /// The closest station by straight line, unless the runner-up is close enough
@@ -155,6 +176,8 @@ struct PathFeed {
         let secondsToArrival: String
         let headSign: String
         let lineColor: String
+        /// When PATH computed `secondsToArrival`; often a minute before we fetch.
+        let lastUpdated: String?
     }
 
     let fetchedAt: Date
@@ -172,9 +195,28 @@ struct PathFeed {
             .filter { station.shows($0.headSign) }
             .compactMap { m in
                 guard let seconds = Double(m.secondsToArrival) else { return nil }
-                return Departure(date: fetchedAt.addingTimeInterval(seconds), headsign: m.headSign,
+                return Departure(date: Self.postedAt(m.lastUpdated, fetchedAt: fetchedAt).addingTimeInterval(seconds),
+                                 headsign: m.headSign,
                                  lineColors: m.lineColor.uppercased())
             }
             .sorted { $0.date < $1.date }
+    }
+
+    /// Counts are measured from when PATH posted them, not from our fetch, so they
+    /// match the RidePATH app instead of reading up to a minute high. Falls back
+    /// to the fetch time if the stamp is missing or implausible.
+    static func postedAt(_ stamp: String?, fetchedAt: Date) -> Date {
+        guard let stamp, let posted = parseStamp(stamp),
+              posted <= fetchedAt.addingTimeInterval(5), posted > fetchedAt.addingTimeInterval(-600) else { return fetchedAt }
+        return posted
+    }
+
+    /// "2026-11-02T14:49:42.949787-05:00": ISO 8601 with microseconds, which
+    /// ISO8601DateFormatter won't parse, so the fraction is added separately.
+    static func parseStamp(_ s: String) -> Date? {
+        let pattern = #/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})$/#
+        guard let m = s.wholeMatch(of: pattern),
+              let base = ISO8601DateFormatter().date(from: String(m.1) + String(m.3)) else { return nil }
+        return base.addingTimeInterval(m.2.flatMap { Double("0" + $0) } ?? 0)
     }
 }

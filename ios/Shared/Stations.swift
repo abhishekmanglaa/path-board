@@ -7,7 +7,7 @@ struct Station: Hashable {
     let latitude: Double
     let longitude: Double
     /// Lowercased headsign fragments of the trains worth showing from here:
-    /// trains that stop at Newport, or at Newport itself, trains into New York.
+    /// trains that stop at Newport, or at Newport itself, every direction.
     let shownHeadsigns: [String]
     /// Shown when there's no direct train home from this station.
     let note: String?
@@ -23,26 +23,42 @@ struct Station: Hashable {
         return shownHeadsigns.contains { h.hasPrefix($0) }
     }
 
-    /// How the board groups this station's trains. Away from home there's one group
-    /// (anything that gets you to Newport); at Newport, one per New York terminal,
-    /// the way the RidePATH app lists them.
-    var destinations: [Destination] {
-        isHome
-            ? [Destination(label: "World Trade Center", short: "WTC", match: "world trade"),
-               Destination(label: "33rd Street", short: "33rd St", match: "33rd")]
-            : [Destination(label: "Newport", short: "Newport", match: nil)]
-    }
+    /// The directions the board can show from here. Away from home there's one
+    /// (anything that gets you to Newport); at Newport, each terminal, the way the
+    /// RidePATH app lists them. Which of those appear is a setting.
+    var destinations: [Destination] { isHome ? Destination.newport : [Destination.toNewport] }
 }
 
-struct Destination: Hashable {
+struct Destination: Hashable, Identifiable {
+    /// Also the key into Newport's timetable.
+    let id: String
     let label: String
     let short: String
-    /// Headsign fragment; nil means every train listed for the station.
+    /// For the small widget's narrow rows.
+    let tiny: String
+    /// Headsign prefix; nil means every train listed for the station.
     let match: String?
+    /// What a scheduled train in this direction looks like before any are posted.
+    let headsign: String
+    let lineColors: String
 
     func includes(_ d: Departure) -> Bool {
         match.map { d.headsign.lowercased().hasPrefix($0) } ?? true
     }
+
+    static let newport: [Destination] = [
+        Destination(id: "WTC", label: "World Trade Center", short: "WTC", tiny: "WTC",
+                    match: "world trade", headsign: "World Trade Center", lineColors: "65C100"),
+        Destination(id: "33", label: "33rd Street", short: "33rd St", tiny: "33rd",
+                    match: "33rd", headsign: "33rd Street", lineColors: "FF9900"),
+        Destination(id: "JSQ", label: "Journal Square", short: "Journal Sq", tiny: "JSQ",
+                    match: "journal", headsign: "Journal Square", lineColors: "FF9900"),
+        Destination(id: "HOB", label: "Hoboken", short: "Hoboken", tiny: "HOB",
+                    match: "hoboken", headsign: "Hoboken", lineColors: "65C100"),
+    ]
+    static let defaultNewportIDs = ["WTC", "33", "JSQ"]
+    static let toNewport = Destination(id: "home", label: "Newport", short: "Newport", tiny: "Newport",
+                                       match: nil, headsign: "", lineColors: "")
 }
 
 extension Station {
@@ -62,7 +78,7 @@ extension Station {
         Station(id: "GRV", name: "Grove Street", latitude: 40.7197, longitude: -74.0429,
                 shownHeadsigns: ["33rd"], note: nil),
         Station(id: "NEW", name: "Newport", latitude: 40.7270, longitude: -74.0337,
-                shownHeadsigns: ["world trade", "33rd"], note: nil),
+                shownHeadsigns: ["world trade", "33rd", "journal", "hoboken"], note: nil),
         Station(id: "EXP", name: "Exchange Place", latitude: 40.7163, longitude: -74.0328,
                 shownHeadsigns: ["hoboken"], note: nil),
         Station(id: "HOB", name: "Hoboken", latitude: 40.7353, longitude: -74.0291,

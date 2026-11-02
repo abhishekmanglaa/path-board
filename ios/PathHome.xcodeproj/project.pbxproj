@@ -7,16 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0F7D05DB81D8A9EA426DD50E /* GlassViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D77AD4DAFC5A4A4F01173F5 /* GlassViews.swift */; };
 		13F879FD84B2814818707CF8 /* PathHomeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB7BF3AAD1AE9E7FB5A421 /* PathHomeApp.swift */; };
 		1A485ED3DFEE4EB766A3E922 /* Planner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EADAAD18BD64F1EFABAA76 /* Planner.swift */; };
 		1A9BA50BA6528C953A2A1A20 /* LocationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEBCAE6D9B37DD3A434BDC0 /* LocationMonitor.swift */; };
 		21A5F79F76110160115A1912 /* PathHomeWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 870723A6825A9195CAA297A3 /* PathHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		38727609EF6DDC5CFE69C729 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */; };
 		39D0C9DF10CBE446C7AB6B8E /* Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = C483453D8B67CE8E68ACEDBA /* Samples.swift */; };
+		52A1460B9D43778FB37D36D5 /* NewportSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230909AE7FF200DA1358A936 /* NewportSchedule.swift */; };
+		58AB2ADC45D8F42A05AF8747 /* NewportSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230909AE7FF200DA1358A936 /* NewportSchedule.swift */; };
+		6B5D74F0884F0718B759E04F /* GlassViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D77AD4DAFC5A4A4F01173F5 /* GlassViews.swift */; };
 		74C68948576EBA85D0E4B126 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */; };
 		8338E0FC62C2E06044A57752 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F24C9C67F24EA8CA811EB14 /* ContentView.swift */; };
 		833E869739116C5240E9E924 /* Planner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EADAAD18BD64F1EFABAA76 /* Planner.swift */; };
 		91ADC3ADDD6373C404D2B48A /* BoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E33595A98F575A21FAE398 /* BoardViews.swift */; };
+		92808309E4AB88E40BE3DD8C /* NewportTimetable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7491DC72AEFBA79C5656D70 /* NewportTimetable.swift */; };
 		9887164D31F0957D8DFC2530 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328BEE406BC709618E109B26 /* Theme.swift */; };
 		A0EF1745845BA37AAFBC5667 /* BoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E33595A98F575A21FAE398 /* BoardViews.swift */; };
 		A3A2E1029B8889EF5ED29BB4 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */; };
@@ -27,6 +32,7 @@
 		D7A19A1201F51D1117059456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */; };
 		D9803F98B1AC4EB6124DD389 /* PathHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FA1574B834E19C1AC23DDB /* PathHomeTests.swift */; };
 		DA689B3AADAC7B4EAA63A960 /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
+		DD4BC8DCB435AFDB21540D66 /* NewportTimetable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7491DC72AEFBA79C5656D70 /* NewportTimetable.swift */; };
 		DF6B9C809D5BE8CEE70B474B /* RenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BC71C49E8393512381BDB5B /* RenderTests.swift */; };
 		EA841A6B4E190F986B38835B /* Stations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D461805193F1FC631DEEB /* Stations.swift */; };
 		EF093286BA57B57033FA463E /* TimelineBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE99A69AB1D97B192CA7E8FA /* TimelineBuilder.swift */; };
@@ -66,10 +72,12 @@
 
 /* Begin PBXFileReference section */
 		045D461805193F1FC631DEEB /* Stations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stations.swift; sourceTree = "<group>"; };
+		230909AE7FF200DA1358A936 /* NewportSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewportSchedule.swift; sourceTree = "<group>"; };
 		2BEBCAE6D9B37DD3A434BDC0 /* LocationMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationMonitor.swift; sourceTree = "<group>"; };
 		328BEE406BC709618E109B26 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		510B7B29498014EE9726BFB1 /* PathHome.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PathHome.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		626ED1B495394693FBF9337B /* PathHomeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathHomeWidget.swift; sourceTree = "<group>"; };
+		6D77AD4DAFC5A4A4F01173F5 /* GlassViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassViews.swift; sourceTree = "<group>"; };
 		706BDC6582F8476A90F0F7E0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7ACB7BF3AAD1AE9E7FB5A421 /* PathHomeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathHomeApp.swift; sourceTree = "<group>"; };
 		7F2A8ACCC8A60E4B2FCD6C5D /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
@@ -82,6 +90,7 @@
 		BDAD85E9FD7342B19EBE4A17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BDD877E0BB226B00F415BCE7 /* PathHomeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PathHomeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C483453D8B67CE8E68ACEDBA /* Samples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Samples.swift; sourceTree = "<group>"; };
+		C7491DC72AEFBA79C5656D70 /* NewportTimetable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewportTimetable.swift; sourceTree = "<group>"; };
 		CE99A69AB1D97B192CA7E8FA /* TimelineBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineBuilder.swift; sourceTree = "<group>"; };
 		D2C7FBC562AAFE803BC6628E /* PathHome.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathHome.entitlements; sourceTree = "<group>"; };
 		D7A3706C7293568C87FA4B26 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -124,6 +133,9 @@
 			isa = PBXGroup;
 			children = (
 				B2E33595A98F575A21FAE398 /* BoardViews.swift */,
+				6D77AD4DAFC5A4A4F01173F5 /* GlassViews.swift */,
+				230909AE7FF200DA1358A936 /* NewportSchedule.swift */,
+				C7491DC72AEFBA79C5656D70 /* NewportTimetable.swift */,
 				D9EADAAD18BD64F1EFABAA76 /* Planner.swift */,
 				90C4FEF1FC42134FB2336A1A /* RefreshIntent.swift */,
 				C483453D8B67CE8E68ACEDBA /* Samples.swift */,
@@ -226,15 +238,15 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					41EE7CF211F6CD08D10C4C8C = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 75YY993Y27;
 						ProvisioningStyle = Automatic;
 					};
 					6423378D3626C08AF662BA8B = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 75YY993Y27;
 						ProvisioningStyle = Automatic;
 					};
 					84D76915533383C08A1402DD = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 75YY993Y27;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -278,7 +290,10 @@
 			files = (
 				91ADC3ADDD6373C404D2B48A /* BoardViews.swift in Sources */,
 				8338E0FC62C2E06044A57752 /* ContentView.swift in Sources */,
+				0F7D05DB81D8A9EA426DD50E /* GlassViews.swift in Sources */,
 				1A9BA50BA6528C953A2A1A20 /* LocationMonitor.swift in Sources */,
+				52A1460B9D43778FB37D36D5 /* NewportSchedule.swift in Sources */,
+				DD4BC8DCB435AFDB21540D66 /* NewportTimetable.swift in Sources */,
 				13F879FD84B2814818707CF8 /* PathHomeApp.swift in Sources */,
 				833E869739116C5240E9E924 /* Planner.swift in Sources */,
 				38727609EF6DDC5CFE69C729 /* RefreshIntent.swift in Sources */,
@@ -304,6 +319,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0EF1745845BA37AAFBC5667 /* BoardViews.swift in Sources */,
+				6B5D74F0884F0718B759E04F /* GlassViews.swift in Sources */,
+				58AB2ADC45D8F42A05AF8747 /* NewportSchedule.swift in Sources */,
+				92808309E4AB88E40BE3DD8C /* NewportTimetable.swift in Sources */,
 				D2266097D2A060AEA78D2A4B /* PathHomeWidget.swift in Sources */,
 				1A485ED3DFEE4EB766A3E922 /* Planner.swift in Sources */,
 				A3A2E1029B8889EF5ED29BB4 /* RefreshIntent.swift in Sources */,
@@ -435,7 +453,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 75YY993Y27;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -535,7 +553,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 75YY993Y27;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

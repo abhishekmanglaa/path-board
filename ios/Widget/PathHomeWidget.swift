@@ -71,9 +71,35 @@ struct PathHomeWidget: Widget {
     }
 }
 
+/// The same board as rings on smoked glass. When both widgets reload together the
+/// second reuses the first's plan (`Planner.reuseWindow`), so it costs no extra fetch.
+struct PathHomeGlassWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "PathHomeGlass", provider: Provider()) { entry in
+            PathHomeGlassView(entry: entry)
+        }
+        .configurationDisplayName("Train Rings")
+        .description("Walk time and the next train in each direction, as rings.")
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+struct PathHomeGlassView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: BoardEntry
+
+    var body: some View {
+        GlassBoardView(entry: entry, family: family)
+            .environment(\.colorScheme, .dark)
+            .widgetURL(entry.deepLink)
+            .containerBackground(for: .widget) { GlassBackground() }
+    }
+}
+
 @main
 struct PathHomeWidgets: WidgetBundle {
     var body: some Widget {
         PathHomeWidget()
+        PathHomeGlassWidget()
     }
 }

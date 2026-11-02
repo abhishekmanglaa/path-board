@@ -32,6 +32,17 @@ enum SharedStore {
         set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: "plan") }
     }
 
+    /// Which directions the board shows at Newport, in the app's settings.
+    static var newportDestinationIDs: [String] {
+        get { defaults.stringArray(forKey: "newport.destinations") ?? Destination.defaultNewportIDs }
+        set { defaults.set(newValue, forKey: "newport.destinations") }
+    }
+
+    static var newportDestinations: [Destination] {
+        let ids = newportDestinationIDs
+        return Destination.newport.filter { ids.contains($0.id) }
+    }
+
     /// Whichever fix is newer: one the widget can read directly, or one the app stored.
     static func freshestLocation(_ candidates: CLLocation?...) -> CLLocation? {
         (candidates + [lastLocation]).compactMap { $0 }.max { $0.timestamp < $1.timestamp }

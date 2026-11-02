@@ -7,7 +7,8 @@ import WidgetKit
 /// With "Always" access, iOS relaunches the app in the background on two kinds of
 /// events: significant movement (~500 m, cell-tower based, near-zero battery) and
 /// entering/leaving a geofence around each PATH station. Each wakeup stores the
-/// new fix for the widget and asks WidgetKit to rebuild its timeline.
+/// new fix for the widget and asks WidgetKit to rebuild its timeline. While the
+/// app is open it follows you continuously, so a move shows up right away.
 @MainActor
 final class LocationMonitor: NSObject, ObservableObject {
     static let shared = LocationMonitor()
@@ -16,15 +17,21 @@ final class LocationMonitor: NSObject, ObservableObject {
     @Published private(set) var plan: Plan?
     @Published private(set) var error: String?
     @Published private(set) var isRefreshing = false
+    private var isFollowing = false
+    /// The next plan refetches trains even if a fresh one exists for this spot.
+    private var forceNextPlan = false
 
     private let manager = CLLocationManager()
     private static let stationRadius: CLLocationDistance = 300
+    /// While open, a move this far is worth a new plan (and maybe a new station).
+    private static let foregroundDistanceFilter: CLLocationDistance = 50
 
     override private init() {
         authorization = manager.authorizationStatus
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = Self.foregroundDistanceFilter
         plan = SharedStore.lastPlan
         startBackgroundMonitoringIfAllowed()
     }
@@ -42,10 +49,35 @@ final class LocationMonitor: NSObject, ObservableObject {
         }
     }
 
+    /// Refetches trains (never served from the reuse window) for where you are now.
     func refresh() {
         guard hasAnyAccess else { return }
         isRefreshing = true
-        manager.requestLocation()
+        forceNextPlan = true
+        // While following, iOS ignores one-shot requests and only reports moves, so
+        // plan from the fix it's already tracking.
+        if isFollowing, let here = manager.location {
+            Task { await handle(here) }
+        } else if !isFollowing {
+            manager.requestLocation()
+        }
+        // Following without a fix yet: the first one is on its way and will be forced.
+    }
+
+    /// Continuous updates only while the app is on screen; in the background the
+    /// cheap significant-change and geofence events take over.
+    func setForeground(_ active: Bool) {
+        guard hasAnyAccess else { return }
+        if active {
+            if !isFollowing {
+                isFollowing = true
+                manager.startUpdatingLocation()
+            }
+            refresh()
+        } else {
+            isFollowing = false
+            manager.stopUpdatingLocation()
+        }
     }
 
     private func startBackgroundMonitoringIfAllowed() {
@@ -69,8 +101,10 @@ final class LocationMonitor: NSObject, ObservableObject {
             UIApplication.shared.endBackgroundTask(task)
             isRefreshing = false
         }
+        let force = forceNextPlan
+        forceNextPlan = false
         do {
-            let plan = try await Planner.plan(from: location)
+            let plan = try await Planner.plan(from: location, forceFresh: force)
             SharedStore.lastPlan = plan
             self.plan = plan
             error = nil
@@ -85,7 +119,8 @@ extension LocationMonitor: CLLocationManagerDelegate {
         Task { @MainActor in
             authorization = manager.authorizationStatus
             startBackgroundMonitoringIfAllowed()
-            if hasAnyAccess { refresh() }
+            // Access granted while on screen: start following now, not on the next launch.
+            setForeground(UIApplication.shared.applicationState == .active)
             WidgetCenter.shared.reloadAllTimelines()
         }
     }

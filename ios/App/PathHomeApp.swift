@@ -20,7 +20,7 @@ struct PathHomeApp: App {
             ContentView(monitor: .shared)
                 .onOpenURL(perform: open)
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { LocationMonitor.shared.refresh() }
+                    LocationMonitor.shared.setForeground(phase == .active)
                 }
         }
     }

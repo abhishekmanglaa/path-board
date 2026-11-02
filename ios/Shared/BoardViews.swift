@@ -15,7 +15,7 @@ struct BoardEntry: TimelineEntry {
     /// Smart Stack ranking: rises as the next train gets close to the walk time,
     /// so a stack rotates the train widget to the top when it actually matters.
     var relevance: TimelineEntryRelevance? {
-        guard case .plan(let plan) = state, let next = BoardSnapshot(plan: plan, at: date).rows.first else {
+        guard case .plan(let plan) = state, let next = BoardSnapshot(plan: plan, at: date).next else {
             return TimelineEntryRelevance(score: 0)
         }
         let slack = next.minutes - plan.walkMinutes
@@ -24,55 +24,65 @@ struct BoardEntry: TimelineEntry {
     }
 }
 
-/// What one moment of the board says, derived from a plan at `date`.
+/// What one moment of the board says, derived from a plan at `date`: one row per
+/// direction, each with its next few trains.
 struct BoardSnapshot {
-    struct Row: Hashable {
+    struct Train: Hashable {
         let departure: Departure
-        /// Whole minutes until it leaves, rounded down like a departure board.
+        /// Whole minutes until it leaves, rounded up the way PATH's own signs and
+        /// the RidePATH app count.
         let minutes: Int
-        /// What the row is called: the line away from home, the terminal at Newport.
-        let label: String
 
-        var line: PathLine { departure.line }
+        var scheduled: Bool { departure.scheduled }
     }
+
+    struct Row: Hashable, Identifiable {
+        let id: String
+        /// The terminal at Newport, the line elsewhere.
+        let label: String
+        /// For the small widget's narrow rows.
+        let tiny: String
+        let trains: [Train]
+
+        var line: PathLine { trains[0].departure.line }
+        var next: Train { trains[0] }
+    }
+
+    static let trainsPerRow = 3
 
     let station: Station
     let walkMinutes: Int
-    /// Up to three trains, in display order; layouts show as many as fit.
     let rows: [Row]
 
-    init(plan: Plan, at date: Date) {
+    init(plan: Plan, at date: Date, showing destinations: [Destination] = SharedStore.newportDestinations) {
         station = plan.station
         walkMinutes = plan.walkMinutes
-        let home = plan.station.isHome
-        rows = plan.rows(at: date).prefix(3).map { d in
-            Row(departure: d,
-                minutes: Self.minutes(from: date, to: d.date),
-                label: home ? Self.terminal(for: d, at: plan.station) : d.line.shortName)
+        let upcoming = plan.upcoming(at: date)
+        func train(_ d: Departure) -> Train { Train(departure: d, minutes: Self.minutes(from: date, to: d.date)) }
+
+        if plan.station.isHome {
+            // Fixed order, like RidePATH, so each direction stays where the eye expects it.
+            rows = destinations.compactMap { dest in
+                let trains = upcoming.filter(dest.includes).prefix(Self.trainsPerRow).map(train)
+                return trains.isEmpty ? nil : Row(id: dest.id, label: dest.short, tiny: dest.tiny, trains: trains)
+            }
+        } else {
+            // One row per line that gets you to Newport, soonest line first.
+            var lines: [String] = []
+            for d in upcoming where !lines.contains(d.line.shortName) { lines.append(d.line.shortName) }
+            rows = lines.map { name in
+                Row(id: name, label: name, tiny: name,
+                    trains: upcoming.filter { $0.line.shortName == name }.prefix(Self.trainsPerRow).map(train))
+            }
         }
     }
 
-    static func minutes(from date: Date, to target: Date) -> Int { max(0, Int(target.timeIntervalSince(date) / 60)) }
-
-    private static func terminal(for d: Departure, at station: Station) -> String {
-        station.destinations.first { $0.includes(d) }?.short ?? d.line.shortName
+    static func minutes(from date: Date, to target: Date) -> Int {
+        max(0, Int((target.timeIntervalSince(date) / 60).rounded(.up)))
     }
 
-    /// "4 · 14 · 24" for the first `count` trains.
-    func minutesList(_ count: Int) -> String {
-        rows.prefix(count).map { "\($0.minutes)" }.joined(separator: " · ")
-    }
-
-    /// At Newport, minutes per terminal in order ("WTC" → [6, 16]), so one-line
-    /// layouts never put a 33rd St time under a WTC label.
-    var terminals: [(label: String, minutes: [Int])] {
-        var out: [(label: String, minutes: [Int])] = []
-        for r in rows {
-            if let i = out.firstIndex(where: { $0.label == r.label }) { out[i].minutes.append(r.minutes) }
-            else { out.append((r.label, [r.minutes])) }
-        }
-        return out
-    }
+    /// The soonest train in any row.
+    var next: Train? { rows.map(\.next).min { $0.departure.date < $1.departure.date } }
 }
 
 extension Station {
@@ -146,27 +156,32 @@ private struct WalkBadge: View {
     }
 }
 
-/// Shows as many rows as fit (3, else 2, else 1), so a third train appears only
-/// where there's room for it — no clipping on smaller widget sizes.
+/// Shows as many directions as fit, tightening rows before dropping one — no
+/// clipping on smaller widget sizes.
 private struct TrainList<RowView: View>: View {
     let rows: [BoardSnapshot.Row]
     let spacing: CGFloat
-    let row: (BoardSnapshot.Row, Bool) -> RowView
+    let height: CGFloat
+    let row: (BoardSnapshot.Row, CGFloat) -> RowView
 
     var body: some View {
         if rows.isEmpty {
             EmptyCard()
         } else {
+            // Each count at full height, then tightened, before giving up a direction.
             ViewThatFits(in: .vertical) {
-                ForEach([3, 2, 1].filter { $0 <= rows.count }, id: \.self) { count in
-                    VStack(spacing: spacing) {
-                        ForEach(Array(rows.prefix(count).enumerated()), id: \.element) { i, r in
-                            row(r, i == 0)
-                        }
-                    }
+                ForEach((1...min(rows.count, 4)).reversed(), id: \.self) { n in
+                    list(n, height: height, spacing: spacing)
+                    list(n, height: height * 0.78, spacing: spacing * 0.6)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func list(_ count: Int, height: CGFloat, spacing: CGFloat) -> some View {
+        VStack(spacing: spacing) {
+            ForEach(rows.prefix(count)) { row($0, height) }
         }
     }
 }
@@ -187,8 +202,8 @@ private struct SmallView: View {
                 Spacer(minLength: 0)
                 RefreshButton()
             }
-            TrainList(rows: snap.rows, spacing: 4) { row, _ in
-                SmallRow(row: row)
+            TrainList(rows: snap.rows, spacing: 4, height: 24) { row, height in
+                SmallRow(row: row, height: height)
             }
         }
     }
@@ -197,22 +212,24 @@ private struct SmallView: View {
 private struct SmallRow: View {
     @Environment(\.widgetRenderingMode) private var mode
     let row: BoardSnapshot.Row
+    let height: CGFloat
 
     var body: some View {
         let paint = CardPaint(line: row.line, mode: mode)
         HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(row.label)
+            Text(row.tiny)
                 .font(Theme.rounded(12, .black))
                 .lineLimit(1).minimumScaleFactor(0.7)
+                .layoutPriority(1)
             Spacer(minLength: 2)
-            Minutes(value: row.minutes, size: 17)
+            Times(trains: row.trains, size: 16, unit: false)
         }
         .foregroundStyle(paint.ink)
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: height)
         .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 8))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(row.label) in \(row.minutes) minutes")
+        .accessibilityLabel(Times.spoken(row))
     }
 }
 
@@ -230,8 +247,8 @@ private struct MediumView: View {
                 WalkBadge(minutes: snap.walkMinutes, stale: stale)
                 RefreshButton()
             }
-            TrainList(rows: snap.rows, spacing: 5) { row, first in
-                MediumRow(row: row, live: first)
+            TrainList(rows: snap.rows, spacing: 5, height: 28) { row, height in
+                MediumRow(row: row, home: snap.station.isHome, height: height)
             }
         }
     }
@@ -240,61 +257,86 @@ private struct MediumView: View {
 private struct MediumRow: View {
     @Environment(\.widgetRenderingMode) private var mode
     let row: BoardSnapshot.Row
-    let live: Bool
+    let home: Bool
+    let height: CGFloat
 
     var body: some View {
         let paint = CardPaint(line: row.line, mode: mode)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(row.line.shortName)
+            Text(row.label)
                 .font(Theme.rounded(13, .black))
                 .lineLimit(1)
-                .layoutPriority(1)
-            HStack(spacing: 2) {
-                Image(systemName: "arrow.right").font(Theme.rounded(9, .black))
-                Text(row.line.towardsShort)
+                .layoutPriority(2)
+            // At Newport the row is the terminal, so name the line; elsewhere the
+            // row is the line, so name where it's headed.
+            Group {
+                if home {
+                    Text(row.line.shortName)
+                } else {
+                    HStack(spacing: 2) {
+                        Image(systemName: "arrow.right").font(Theme.rounded(9, .black))
+                        Text(row.line.towardsShort)
+                    }
+                }
             }
-            .font(Theme.rounded(12, .bold))
-            .opacity(0.85)
-            .lineLimit(1).minimumScaleFactor(0.75)
+            .font(Theme.rounded(11, .bold))
+            .opacity(0.8)
+            .lineLimit(1).minimumScaleFactor(0.8)
             Spacer(minLength: 4)
-            Text(row.departure.date, style: .time)
-                .font(Theme.rounded(11, .semibold))
-                .opacity(0.8)
-                .lineLimit(1)
-                .fixedSize()
-            Minutes(value: row.minutes, size: 18)
-                .frame(minWidth: 52, alignment: .trailing)
+            Times(trains: row.trains, size: 18, unit: true)
+                .layoutPriority(1)
             // Space is reserved on every row so the minute column lines up.
             RealtimeMark(color: paint.ink).frame(width: 9, height: 9)
-                .opacity(live ? 1 : 0)
-                .accessibilityHidden(!live)
+                .opacity(row.next.scheduled ? 0 : 1)
+                .accessibilityHidden(row.next.scheduled)
         }
         .foregroundStyle(paint.ink)
         .padding(.horizontal, 10)
-        .frame(height: 28)
+        .frame(height: height)
         .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 9))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(row.line.name) to \(row.line.towards) in \(row.minutes) minutes")
+        .accessibilityLabel(Times.spoken(row))
     }
 }
 
-/// "8 min": the count is what the eye looks for; it takes the accent tint and
-/// shimmers while a refresh is in flight.
-private struct Minutes: View {
-    let value: Int
+/// "8 min  18  28": the next train large (the number the eye looks for, which
+/// takes the accent tint), the ones after it smaller. Timetabled trains are
+/// dimmed. Drops later trains rather than truncating when space runs out.
+private struct Times: View {
+    let trains: [BoardSnapshot.Train]
     let size: CGFloat
+    /// Whether "min" follows the first count; the small widget has no room.
+    let unit: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 1) {
-            Text("\(value)")
-                .font(Theme.rounded(size, .black))
-                .contentTransition(.numericText(countsDown: true))
-                .widgetAccentable()
-                .invalidatableContent()
-            Text("min").font(Theme.rounded(size * 0.55, .heavy))
+        ViewThatFits(in: .horizontal) {
+            ForEach((1...trains.count).reversed(), id: \.self) { n in
+                HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
+                    ForEach(Array(trains.prefix(n).enumerated()), id: \.element) { i, t in
+                        count(t, first: i == 0)
+                    }
+                }
+            }
         }
         .lineLimit(1)
+    }
+
+    @ViewBuilder private func count(_ t: BoardSnapshot.Train, first: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text("\(t.minutes)")
+                .font(Theme.rounded(first ? size : size * 0.72, first ? .black : .heavy))
+                .contentTransition(.numericText(countsDown: true))
+                .widgetAccentable(first)
+                .invalidatableContent()
+            if first && unit { Text("min").font(Theme.rounded(size * 0.55, .heavy)) }
+        }
+        .opacity(t.scheduled ? (first ? 0.8 : 0.6) : (first ? 1 : 0.85))
         .fixedSize()
+    }
+
+    static func spoken(_ row: BoardSnapshot.Row) -> String {
+        let times = row.trains.map { "\($0.minutes)\($0.scheduled ? " scheduled" : "")" }
+        return "\(row.label) in \(times.joined(separator: ", ")) minutes"
     }
 }
 
@@ -399,6 +441,13 @@ private struct MessageView: View {
 
 // MARK: - Lock screen
 
+extension BoardSnapshot.Row {
+    /// "3 · 13 · 23" for the first `count` trains.
+    func list(_ count: Int) -> String {
+        trains.prefix(count).map { "\($0.minutes)" }.joined(separator: " · ")
+    }
+}
+
 private struct RectangularView: View {
     let snap: BoardSnapshot
 
@@ -407,30 +456,22 @@ private struct RectangularView: View {
             Label("\(snap.walkMinutes) min · \(snap.station.shortName)", systemImage: "figure.walk")
                 .font(Theme.rounded(13, .semibold))
                 .lineLimit(1).minimumScaleFactor(0.8)
-            if snap.station.isHome, !snap.rows.isEmpty {
-                ForEach(snap.terminals.prefix(2), id: \.label) { t in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(t.label).font(Theme.rounded(13, .bold))
-                        Text(t.minutes.prefix(2).map(String.init).joined(separator: " · ") + " min")
-                            .font(Theme.rounded(17, .heavy))
-                            .widgetAccentable()
-                    }
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                }
-            } else if let first = snap.rows.first {
-                Text(first.label)
-                    .font(Theme.rounded(13, .bold))
-                    .lineLimit(1)
-                // As many departures as fit on one line.
-                ViewThatFits(in: .horizontal) {
-                    ForEach([3, 2, 1].filter { $0 <= snap.rows.count }, id: \.self) { n in
-                        Text(snap.minutesList(n) + " min")
-                    }
-                }
-                .font(Theme.rounded(18, .heavy))
-                .widgetAccentable()
-            } else {
+            if snap.rows.isEmpty {
                 Text("No trains posted yet").font(Theme.rounded(15, .heavy))
+            }
+            ForEach(snap.rows.prefix(2)) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(row.tiny).font(Theme.rounded(13, .bold))
+                    // As many departures as fit on the line.
+                    ViewThatFits(in: .horizontal) {
+                        ForEach((1...row.trains.count).reversed(), id: \.self) { n in
+                            Text(row.list(n) + " min")
+                        }
+                    }
+                    .font(Theme.rounded(17, .heavy))
+                    .widgetAccentable()
+                }
+                .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -441,16 +482,15 @@ private struct InlineView: View {
     let snap: BoardSnapshot
 
     var body: some View {
-        // The inline slot fits ~20 characters; station and the next two counts.
+        // The inline slot fits ~20 characters: as many directions' next train as fit.
         if snap.rows.isEmpty {
             Label("\(snap.station.shortName) · no trains", systemImage: "tram.fill")
-        } else if snap.station.isHome {
-            Label(snap.terminals.map { "\($0.label) \($0.minutes[0])" }.joined(separator: " · ") + " min",
-                  systemImage: "tram.fill")
         } else {
             ViewThatFits(in: .horizontal) {
-                Label("\(snap.station.shortName) \(snap.minutesList(2)) min", systemImage: "tram.fill")
-                Label("\(snap.station.shortName) \(snap.minutesList(1)) min", systemImage: "tram.fill")
+                ForEach((1...snap.rows.count).reversed(), id: \.self) { n in
+                    Label(snap.rows.prefix(n).map { "\($0.tiny) \($0.next.minutes)" }.joined(separator: " · ") + " min",
+                          systemImage: "tram.fill")
+                }
             }
         }
     }
@@ -462,10 +502,10 @@ private struct CircularView: View {
     var body: some View {
         ZStack {
             AccessoryWidgetBackground()
-            if let first = snap.rows.first {
+            if let row = snap.rows.min(by: { $0.next.departure.date < $1.next.departure.date }) {
                 VStack(spacing: -2) {
-                    Text("\(first.minutes)").font(Theme.rounded(22, .black)).widgetAccentable()
-                    Text(snap.station.isHome ? first.label : "min")
+                    Text("\(row.next.minutes)").font(Theme.rounded(22, .black)).widgetAccentable()
+                    Text(snap.station.isHome ? row.tiny : "min")
                         .font(Theme.rounded(10, .bold))
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
