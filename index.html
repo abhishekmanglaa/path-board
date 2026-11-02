@@ -288,10 +288,13 @@ for (const day in SCHED)
 function dayType(d) { const g=d.getDay(); return g===0?"sun":g===6?"sat":"weekday"; }
 function startOfDay(d) { const x=new Date(d); x.setHours(0,0,0,0); return x; }
 function minutesToDate(dayRef, m) { const x=startOfDay(dayRef); x.setMinutes(m); return x; }
+// Wall-clock minute of day, which is what SCHED is keyed by. Not (d - midnight):
+// on DST change days that counts elapsed minutes and is off by 60.
+function wallMinutes(d) { return d.getHours()*60+d.getMinutes()+d.getSeconds()/60+d.getMilliseconds()/60000; }
 
 function scheduledDepartures(schedKey, now, after, limit) {
   const out=[];
-  const afterMin=(after-startOfDay(now))/60000;
+  const afterMin=wallMinutes(after);
   for (const m of (SCHED[dayType(now)][schedKey]||[])) {
     if (m>afterMin) out.push(minutesToDate(now,m));
     if (out.length>=limit) return out;
@@ -312,7 +315,7 @@ function scheduledDepartures(schedKey, now, after, limit) {
 function nearestScheduledTime(schedKey, targetDate) {
   const arr=SCHED[dayType(targetDate)][schedKey]||[];
   if (!arr.length) return null;
-  const targetMin=(targetDate-startOfDay(targetDate))/60000;
+  const targetMin=wallMinutes(targetDate);
   let best=arr[0];
   for (const m of arr) if (Math.abs(m-targetMin)<Math.abs(best-targetMin)) best=m;
   return minutesToDate(targetDate,best);
@@ -322,7 +325,7 @@ function nextServiceLabel(schedKey, d) {
   if (!schedKey) return "";
   for (let off=0; off<4; off++) {
     const day=new Date(d); day.setDate(day.getDate()+off);
-    const afterMin=off===0?(d-startOfDay(d))/60000:-1;
+    const afterMin=off===0?wallMinutes(d):-1;
     for (const m of (SCHED[dayType(day)][schedKey]||[])) {
       if (m>afterMin) {
         const arr=minutesToDate(day,m);
@@ -336,7 +339,7 @@ function nextServiceLabel(schedKey, d) {
 
 function lineHeadwayMin(schedKey, d) {
   if (!schedKey) return null;
-  const nowMin=(d-startOfDay(d))/60000;
+  const nowMin=wallMinutes(d);
   const up=(SCHED[dayType(d)][schedKey]||[]).filter(m=>m>nowMin&&m<nowMin+120);
   if (up.length<2) return null;
   const gaps=[];
