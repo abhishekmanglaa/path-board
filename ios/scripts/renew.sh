@@ -43,7 +43,9 @@ fi
 
 xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*\(connected\|available\)" || fail "iPhone not reachable"
 
-# Removing the cached profiles makes Xcode request new 7-day ones.
+# Removing the cached profiles makes Xcode request new 7-day ones. Build from
+# scratch too: an earlier build would still point at the removed files.
+rm -rf "$BUILD_DIR"
 backup=$(mktemp -d)
 for f in $ours; do mv "$f" "$backup/"; done
 
