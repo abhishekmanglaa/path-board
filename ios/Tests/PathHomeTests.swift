@@ -23,9 +23,10 @@ final class FeedTests: XCTestCase {
     }
 
     func testOnlyTrainsThatStopAtNewport() throws {
-        // From the NY side and Christopher St: JSQ–33 trains (incl. overnight via Hoboken), never HOB–33.
+        // From the NY side and Christopher St: JSQ–33 trains (incl. overnight via
+        // Hoboken), and HOB–33 to Hoboken, one stop or a walk short of Newport.
         for id in ["33S", "23S", "14S", "09S", "CHR"] {
-            XCTAssertEqual(try shownHeadsigns(at: id), ["Journal Square", "Journal Square via Hoboken"], id)
+            XCTAssertEqual(try shownHeadsigns(at: id), ["Journal Square", "Journal Square via Hoboken", "Hoboken"], id)
         }
         // Downtown: the Hoboken-bound HOB–WTC train, not the Newark one.
         XCTAssertEqual(try shownHeadsigns(at: "WTC"), ["Hoboken"])
@@ -45,7 +46,7 @@ final class FeedTests: XCTestCase {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let feed = try PathFeed(data: fixture(), fetchedAt: t0)
         let deps = feed.departures(from: Station.byID["33S"]!)
-        XCTAssertEqual(deps.map { $0.date.timeIntervalSince(t0) }, [700, 800])
+        XCTAssertEqual(deps.map { $0.date.timeIntervalSince(t0) }, [500, 600, 700, 800])
         XCTAssertEqual(deps.last?.line.name, "JSQ–33 via HOB")
     }
 
@@ -245,8 +246,37 @@ final class TimetableTests: XCTestCase {
         XCTAssertEqual(rows[1].trains.map(\.departure.lineColors), Array(repeating: "4D92FB,FF9900", count: 3))
         // Nothing posted toward Journal Sq: all timetabled.
         XCTAssertTrue(rows[2].trains.allSatisfy(\.scheduled))
-        // Elsewhere no timetable is added.
-        XCTAssertEqual(Planner.withTimetable([wtc], at: Station.byID["HOB"]!, now: weekday), [wtc])
+        // Newark has no line through Newport: no timetable is added.
+        let nwk = Departure(date: weekday.addingTimeInterval(200), headsign: "World Trade Center", lineColors: "D93A30")
+        XCTAssertEqual(Planner.withTimetable([nwk], at: Station.byID["NWK"]!, now: weekday), [nwk])
+    }
+
+    /// Christopher St: the JSQ–33 line passes Newport, so its posted train is
+    /// followed by timetabled ones; HOB–33 (to Hoboken) shows only as posted.
+    func testAwayStationsOnALineThroughNewportGetTimetabledTrains() {
+        let chr = Station.byID["CHR"]!
+        let jsq = Departure(date: weekday.addingTimeInterval(180), headsign: "Journal Square", lineColors: "FF9900")
+        let hob = Departure(date: weekday.addingTimeInterval(300), headsign: "Hoboken", lineColors: "4D92FB")
+        let deps = Planner.withTimetable([jsq, hob], at: chr, now: weekday)
+        let plan = Plan(stationID: "CHR", walkSeconds: 240, departures: deps, computedAt: weekday,
+                        originLatitude: chr.latitude, originLongitude: chr.longitude)
+        let rows = BoardSnapshot(plan: plan, at: weekday).rows
+        XCTAssertEqual(rows.map(\.label), ["JSQ–33", "HOB–33"])
+        XCTAssertEqual(rows[0].trains.map(\.scheduled), [false, true, true])
+        XCTAssertEqual(rows[1].trains.map(\.scheduled), [false])
+        // Timetabled trains run on Newport's Journal Sq-bound gaps, shifted with the posted one.
+        let gaps = zip(rows[0].trains.dropFirst(), rows[0].trains).map { $0.departure.date.timeIntervalSince($1.departure.date) }
+        XCTAssertTrue(gaps.allSatisfy { $0 >= 3 * 60 && $0 <= 12 * 60 }, "\(gaps)")
+    }
+
+    /// The posted train has just left: the line still shows timetabled trains, not "no trains".
+    func testAwayStationWithNothingPostedStillShowsTheTimetable() {
+        let chr = Station.byID["CHR"]!
+        let deps = Planner.withTimetable([], at: chr, now: weekday)
+        XCTAssertGreaterThanOrEqual(deps.count, 3)
+        XCTAssertTrue(deps.allSatisfy { $0.scheduled && $0.headsign == "Journal Square" && $0.lineColors == "FF9900" })
+        // Newark has no line through Newport, so nothing is invented.
+        XCTAssertEqual(Planner.withTimetable([], at: Station.byID["NWK"]!, now: weekday), [])
     }
 
     func testSettingsPickNewportRows() {
@@ -365,6 +395,19 @@ final class HomeAndLinkTests: XCTestCase {
         XCTAssertEqual(Planner.choose([(exp, 60), (new, 480)])?.0.id, "EXP")
         XCTAssertEqual(Planner.choose([(hob, 120), (new, 780)])?.0.id, "HOB")
         XCTAssertNil(Planner.choose([]))
+    }
+
+    /// Same train, more time to catch it: near-equal walks go to the station the
+    /// train reaches later. Corner Bistro's walks per Apple Maps.
+    func testNearTieGoesToTheLaterStationOnTheLine() {
+        let (s14, s9, chr) = (Station.byID["14S"]!, Station.byID["09S"]!, Station.byID["CHR"]!)
+        XCTAssertEqual(Planner.choose([(s14, 636), (s9, 654), (chr, 648)])?.0.id, "CHR")
+        XCTAssertEqual(Planner.choose([(s14, 636), (s9, 654)])?.0.id, "09S")
+        // Not a tie (Buvette): the shorter walk wins.
+        XCTAssertEqual(Planner.choose([(chr, 252), (s9, 504)])?.0.id, "CHR")
+        // Different lines never tie-break.
+        let (exp, grv) = (Station.byID["EXP"]!, Station.byID["GRV"]!)
+        XCTAssertEqual(Planner.choose([(exp, 300), (grv, 330)])?.0.id, "EXP")
     }
 
     func testFarFromPATHIsNotAWalk() async {

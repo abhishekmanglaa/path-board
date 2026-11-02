@@ -98,15 +98,23 @@ enum Planner {
                     originLongitude: here.coordinate.longitude)
     }
 
-    /// At Newport, PATH posts about one train per direction; the timetable fills in
-    /// the ones after it. Other stations have no timetable and show only live trains.
+    /// PATH posts about one or two trains per direction; the timetable fills in
+    /// the ones after. At Newport that's every direction; elsewhere, the line
+    /// through Newport (`Station.timetable`). Other trains show only as posted.
     static func withTimetable(_ live: [Departure], at station: Station, now: Date) -> [Departure] {
-        guard station.isHome else { return live }
-        let scheduled = station.destinations.flatMap { dest -> [Departure] in
+        let legs: [(Destination, TimeInterval)]
+        if station.isHome {
+            legs = station.destinations.map { ($0, 0) }
+        } else if let leg = station.timetable {
+            legs = [(leg.destination, leg.minutesBefore * 60)]
+        } else {
+            return live
+        }
+        let scheduled = legs.flatMap { dest, lead -> [Departure] in
             let posted = live.filter(dest.includes)
             // Scheduled trains look like the posted one (it may be the overnight via-Hoboken run).
             let like = posted.last
-            return NewportSchedule.projected(dest.id, after: posted.map(\.date), now: now).map {
+            return NewportSchedule.projected(dest.id, after: posted.map(\.date), now: now, lead: lead).map {
                 Departure(date: $0, headsign: like?.headsign ?? dest.headsign,
                           lineColors: like?.lineColors ?? dest.lineColors, scheduled: true)
             }
@@ -141,11 +149,22 @@ enum Planner {
         return out
     }
 
+    /// Walks this close count as a tie.
+    static let walkTie: TimeInterval = 90
+
     /// The shortest walk, except that Newport keeps the tie unless another
-    /// station is `homeBias` closer.
+    /// station is `homeBias` closer. Between near-equal walks to stations on the
+    /// same line, the one its trains reach later wins: same train, more time to
+    /// catch it (Corner Bistro is ~11 min from 14th, 9th and Christopher St).
     static func choose(_ walks: [(Station, TimeInterval)]) -> (Station, TimeInterval)? {
-        guard let best = walks.min(by: { $0.1 < $1.1 }) else { return nil }
+        guard var best = walks.min(by: { $0.1 < $1.1 }) else { return nil }
         if let home = walks.first(where: { $0.0.isHome }), home.1 <= best.1 + homeBias { return home }
+        let shortest = best.1
+        for w in walks where w.1 <= shortest + walkTie {
+            if let a = w.0.timetable, let b = best.0.timetable, a.newport == b.newport, a.minutesBefore < b.minutesBefore {
+                best = w
+            }
+        }
         return best
     }
 
