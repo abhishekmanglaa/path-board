@@ -48,15 +48,22 @@ xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*\(connected\|availa
 rm -rf "$BUILD_DIR"
 backup=$(mktemp -d)
 for f in $ours; do mv "$f" "$backup/"; done
+# However this run ends, put back any old profile Xcode didn't replace, so a
+# failed or interrupted renewal leaves things as they were.
+restore() {
+    for f in "$backup"/*(N); do
+        name=$(profile_field "$f" Name)
+        replaced=0
+        for g in "$PROFILES"/*.mobileprovision(N); do [[ $(profile_field "$g" Name) == $name ]] && replaced=1; done
+        (( replaced )) || mv "$f" "$PROFILES/"
+    done
+    rm -rf "$backup"
+}
+trap restore EXIT
 
-if ! xcodebuild -project "$IOS_DIR/PathHome.xcodeproj" -scheme PathHome -configuration Debug \
-        -destination "id=$DEVICE" -derivedDataPath "$BUILD_DIR" -allowProvisioningUpdates build -quiet; then
-    # Put the old profiles back so a later manual build still has them.
-    mv "$backup"/*(N) "$PROFILES/" 2>/dev/null
-    fail "build failed"
-fi
+xcodebuild -project "$IOS_DIR/PathHome.xcodeproj" -scheme PathHome -configuration Debug \
+    -destination "id=$DEVICE" -derivedDataPath "$BUILD_DIR" -allowProvisioningUpdates build -quiet || fail "build failed"
 
 app=$BUILD_DIR/Build/Products/Debug-iphoneos/PathHome.app
 xcrun devicectl device install app --device "$DEVICE" "$app" || fail "install failed"
 echo "installed; now expires $(profile_field "$app/embedded.mobileprovision" ExpirationDate)"
-rm -rf "$backup"
