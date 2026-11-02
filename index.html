@@ -32,7 +32,6 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 @keyframes flapIn     {from{transform:translateY(-6%);opacity:.4}to{transform:translateY(0);opacity:1}}
 @keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:.42}}
 @keyframes softGlow   {0%,100%{opacity:.6}50%{opacity:1}}
-@keyframes rainFall   {0%{transform:translateY(-3px);opacity:0}20%{opacity:1}100%{transform:translateY(13px);opacity:0}}
 @keyframes rainGlow   {0%,100%{box-shadow:0 0 0 0 rgba(74,163,255,.45);border-color:rgba(74,163,255,.55)}50%{box-shadow:0 0 0 13px rgba(74,163,255,0);border-color:rgba(74,163,255,.9)}}
 
 /* ── COLUMNS ─────────────────────────────────────────────────────────── */
@@ -107,28 +106,32 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 /* Weather section */
 .wx-sec{flex:1;padding:24px 28px;display:flex;flex-direction:column;min-height:0}
 .wx-inner{flex:1;display:flex;flex-direction:column;justify-content:center}
-.wx-main{display:flex;align-items:center;gap:16px}
-.wx-icon{width:74px;height:74px;flex-shrink:0}
+.wx-main{display:flex;align-items:center;gap:12px}
+.wx-icon{width:58px;height:58px;flex-shrink:0}
 .wx-icon svg{width:100%;height:100%;display:block;stroke:#cfd2d0}
-.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:154px;line-height:.78;color:#eceae6}
-.wx-cond{font-size:21px;color:#cfd2d0;margin-top:8px}
+.wx-temp{font-family:'Barlow Condensed';font-weight:600;font-size:132px;line-height:.78;color:#eceae6}
+.wx-cond{font-size:20px;color:#cfd2d0;margin-top:8px}
 .wx-lo{color:#8a8f8f}
 
-.rain-box{
-  display:flex;align-items:center;gap:14px;margin-top:12px;
-  background:rgba(74,163,255,.13);
-  border:1px solid rgba(74,163,255,.55);
-  padding:10px 18px;border-radius:14px;
-  animation:rainGlow 2.2s ease infinite;
-}
-.rain-box[hidden]{display:none;animation:none}
-.rain-anim{position:relative;display:inline-block;width:36px;height:36px;flex:none}
-.rain-anim svg{position:absolute;top:0;left:0}
-.rain-drop{position:absolute;left:10px;top:22px;width:2.4px;height:7px;background:#7ec2ff;border-radius:2px;animation:rainFall 1s linear infinite}
-.rain-drop:nth-child(2){left:18px;animation-delay:.34s}
-.rain-drop:nth-child(3){left:26px;animation-delay:.68s}
-.rain-pct{font-family:'Barlow Condensed';font-weight:700;font-size:56px;line-height:.85;color:#7ec2ff}
-.rain-lbl{font-size:16px;letter-spacing:.16em;color:#5f9fd6;line-height:1.3;margin-left:auto;white-space:pre-line}
+/* Feels like + wind, stacked beside the temperature */
+.wx-side{margin-left:auto;display:flex;flex-direction:column;gap:7px;min-width:0}
+.wx-k{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.24em;color:#5a5f62}
+.wx-v{font-family:'Barlow Condensed';font-weight:600;font-size:38px;line-height:.88;color:#dcdad6;white-space:nowrap}
+.wx-u{font-size:15px;letter-spacing:.06em;color:#8a8f8f;margin-left:3px}
+.wx-gust{font-size:13px;letter-spacing:.08em;color:#8a8f8f;white-space:nowrap}
+.wx-arrow{width:13px;height:13px;stroke:#8a8f8f;transition:transform .6s ease}
+
+/* Precipitation: one quiet line when dry, a 2-hour nowcast when rain is near */
+.precip{margin-top:12px;padding:9px 13px;border:1px solid #1c1e20;border-radius:14px}
+.precip-head{display:flex;align-items:center;gap:10px;font-size:17px;color:#8a8f8f;line-height:1.25}
+.precip-head svg{width:20px;height:20px;flex:none;stroke:currentColor}
+.precip.wet{background:rgba(74,163,255,.10);border-color:rgba(74,163,255,.55);animation:rainGlow 2.2s ease infinite}
+.precip.wet .precip-head{color:#a9d4ff}
+.precip-bars{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;align-items:end;height:30px;margin-top:8px}
+.precip-bars[hidden],.precip-axis[hidden]{display:none}
+.precip-bar{background:#7ec2ff;border-radius:3px 3px 1px 1px;min-height:2px;transition:height .6s ease}
+.precip-bar.dry{background:#2a3a4a}
+.precip-axis{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.14em;color:#4f7aa3;margin-top:4px}
 
 .wx-tomorrow{border-top:1px solid #1c1e20;padding-top:11px;font-size:16px;letter-spacing:.1em;color:#565b5d;flex-shrink:0}
 
@@ -141,7 +144,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
   background-size:180px 180px;
 }
 @media(prefers-reduced-motion:reduce){
-  .flap-num.flip,.flap-num.urgent,#night,.rain-box{animation:none;transition:none}
+  .flap-num.flip,.flap-num.urgent,#night,.precip.wet{animation:none;transition:none}
 }
 </style>
 </head>
@@ -220,17 +223,26 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
           <div class="wx-main">
             <div class="wx-icon" id="wx-icon"></div>
             <span class="wx-temp" id="wx-temp">—°</span>
+            <div class="wx-side">
+              <div>
+                <div class="wx-k">FEELS</div>
+                <div class="wx-v" id="wx-feels">—°</div>
+              </div>
+              <div>
+                <div class="wx-k">WIND <svg class="wx-arrow" id="wx-arrow" viewBox="0 0 12 12" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M6 10.5V1.5M2.5 5 6 1.5 9.5 5"/></svg></div>
+                <div class="wx-v"><span id="wx-wind">—</span><span class="wx-u">km/h</span></div>
+                <div class="wx-gust" id="wx-gust"></div>
+              </div>
+            </div>
           </div>
           <div class="wx-cond" id="wx-cond">Loading…</div>
-          <div class="rain-box" id="rain-box" hidden>
-            <span class="rain-anim">
-              <svg width="36" height="24" viewBox="0 0 34 22" fill="none" stroke="#7ec2ff" stroke-width="1.9"><path d="M9 18a6 6 0 0 1 .6-12 7.2 7.2 0 0 1 13.4 2.6 4.6 4.6 0 0 1 .2 9.4z"/></svg>
-              <span class="rain-drop"></span>
-              <span class="rain-drop"></span>
-              <span class="rain-drop"></span>
-            </span>
-            <span class="rain-pct" id="rain-pct">—%</span>
-            <span class="rain-lbl">RAIN&#10;LIKELY</span>
+          <div class="precip" id="precip">
+            <div class="precip-head">
+              <svg viewBox="0 0 20 20" fill="none" stroke-width="1.7" stroke-linejoin="round"><path d="M10 2.5S4.5 8.6 4.5 12.3a5.5 5.5 0 0 0 11 0C15.5 8.6 10 2.5 10 2.5Z"/></svg>
+              <span id="precip-txt">—</span>
+            </div>
+            <div class="precip-bars" id="precip-bars" hidden></div>
+            <div class="precip-axis" id="precip-axis" hidden><span>NOW</span><span>30M</span><span>1H</span><span>1H30</span><span>2H</span></div>
           </div>
         </div>
         <div class="wx-tomorrow" id="wx-tomorrow"></div>
@@ -471,18 +483,69 @@ function updateSunArc(sunrise, sunset) {
 }
 
 /* ── WEATHER ─────────────────────────────────────────────────────── */
+/* Precipitation in the next 2 hours from Open-Meteo's 15-minute data (NOAA HRRR
+   here), phrased the way Carrot does: when it starts or stops. Each minutely_15
+   value is the total for the 15 minutes ending at its timestamp. */
+const PRECIP_WET_MM=0.05;          // per 15 min (~0.2 mm/h): below this reads as dry
+const PRECIP_FULL_MMH=4;           // bar height tops out here
+function precipNowcast(w, now) {
+  const t=w?.minutely_15?.time||[], mm=w?.minutely_15?.precipitation||[], snow=w?.minutely_15?.snowfall||[];
+  const slots=[];
+  for (let i=0;i<t.length&&slots.length<8;i++) {
+    const end=new Date(t[i]);
+    if (end>now) slots.push({start:new Date(end-15*60000),mm:mm[i]||0,snow:(snow[i]||0)>0});
+  }
+  if (!slots.length) return null;
+  const wet=x=>x.mm>=PRECIP_WET_MM;
+  // "~25 min", "~1 hr 10 min", to the nearest 5 minutes.
+  const inMin=d=>{
+    const m=Math.max(5,Math.round((d-now)/300000)*5);
+    return m<60?`${m} min`:`${Math.floor(m/60)} hr`+(m%60?` ${m%60} min`:'');
+  };
+  const kind=slots.some(x=>wet(x)&&x.snow)?'snow':'rain';
+  const Kind=kind[0].toUpperCase()+kind.slice(1);
+  const bars=slots.map(x=>({mmh:x.mm*4,wet:wet(x)}));
+  const nowWet=wet(slots[0])||(w?.current?.precipitation||0)>0;
+  if (nowWet) {
+    const stop=slots.findIndex(x=>!wet(x));
+    return {wet:true,bars,text:stop<0?`${Kind} for the next 2+ hrs`:`${Kind} stopping in ~${inMin(slots[stop].start)}`};
+  }
+  const start=slots.findIndex(wet);
+  if (start>=0) {
+    const peak=Math.max(...bars.map(b=>b.mmh));
+    const how=peak<1?'Light ':peak>=4?'Heavy ':'';
+    return {wet:true,bars,text:`${how}${how?kind:Kind} starting in ~${inMin(slots[start].start)}`};
+  }
+  // Dry for 2 hours: mention the likeliest rain in the next 12.
+  let best=null;
+  const ht=w?.hourly?.time||[], hp=w?.hourly?.precipitation_probability||[];
+  for (let i=0;i<ht.length;i++) {
+    const at=new Date(ht[i]);
+    if (at>now&&at-now<=12*3600000&&(!best||hp[i]>best.p)) best={p:hp[i],at};
+  }
+  if (best&&best.p>=30) {
+    const when=best.at.toLocaleTimeString("en-US",{hour:"numeric",hour12:true});
+    return {wet:false,text:`Dry for now · ${best.p}% chance around ${when}`};
+  }
+  return {wet:false,text:'No rain for the next 12 hrs'};
+}
+
+const COMPASS=['N','NE','E','SE','S','SW','W','NW'];
+
 async function loadWeather() {
   try {
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.LAT}&longitude=${CONFIG.LON}`
-      +`&current=temperature_2m,weather_code,wind_speed_10m,uv_index,apparent_temperature`
+      +`&current=temperature_2m,weather_code,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m`
+      +`&minutely_15=precipitation,snowfall&forecast_minutely_15=12`
       +`&hourly=temperature_2m,weather_code,precipitation_probability`
       +`&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset`
       +`&timezone=America%2FNew_York&forecast_days=4`;
     const res=await fetchWithTimeout(url,{cache:"no-store"});
     if (!res.ok) throw new Error("HTTP "+res.status);
     const w=await res.json();
-    const temp=Math.round(w?.current?.temperature_2m);
-    const code=w?.current?.weather_code;
+    const cur=w?.current;
+    const temp=Math.round(cur?.temperature_2m);
+    const code=cur?.weather_code;
     const g=id=>document.getElementById(id);
     const daily=w?.daily;
 
@@ -495,19 +558,25 @@ async function loadWeather() {
       const condStr=(WMO[code]||'—')+(isNaN(loToday)?'':' · <span class="wx-lo">↓'+loToday+'°</span>');
       g('wx-cond').innerHTML=condStr;
 
-      // Rain indicator — peak precip probability in next 12 hours
-      let rainPct=0;
-      const hTimes=w?.hourly?.time, hProbs=w?.hourly?.precipitation_probability;
-      if (hTimes&&hProbs) {
-        const now=new Date(), cutoff=new Date(now.getTime()+12*3600000);
-        for (let i=0;i<hTimes.length;i++) {
-          const t=new Date(hTimes[i]);
-          if (t>=now&&t<=cutoff&&hProbs[i]>rainPct) rainPct=hProbs[i];
-        }
+      const feels=Math.round(cur?.apparent_temperature);
+      g('wx-feels').textContent=isNaN(feels)?'—°':feels+'°';
+
+      // Wind: direction is where it comes from; the arrow points where it blows.
+      const wind=Math.round(cur?.wind_speed_10m), gust=Math.round(cur?.wind_gusts_10m), dir=cur?.wind_direction_10m;
+      g('wx-wind').textContent=isNaN(wind)?'—':wind;
+      const from=dir==null?'':'FROM '+COMPASS[Math.round(dir/45)%8];
+      g('wx-gust').textContent=[from,gust>=wind+10?'GUSTS '+gust:''].filter(Boolean).join(' · ');
+      if (dir!=null) g('wx-arrow').style.transform=`rotate(${dir+180}deg)`;
+
+      const cast=precipNowcast(w,new Date());
+      const box=g('precip'), bars=g('precip-bars');
+      if (cast) {
+        g('precip-txt').textContent=cast.text;
+        box.classList.toggle('wet',cast.wet);
+        bars.hidden=g('precip-axis').hidden=!cast.wet;
+        if (cast.wet) bars.innerHTML=cast.bars.map(b=>
+          `<div class="precip-bar${b.wet?'':' dry'}" style="height:${b.wet?Math.max(8,Math.min(1,b.mmh/PRECIP_FULL_MMH)*100):5}%"></div>`).join('');
       }
-      const rainBox=g('rain-box');
-      if (rainPct>=20) { g('rain-pct').textContent=rainPct+'%'; rainBox.hidden=false; }
-      else rainBox.hidden=true;
 
       // Tomorrow one-liner
       const tmrHi=Math.round(daily?.temperature_2m_max?.[1]);
