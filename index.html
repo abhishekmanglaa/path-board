@@ -66,6 +66,24 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 #tile0 .flap-unit{color:#9a9f9f}
 #tile1 .flap-unit{color:#b89a3a}
 
+/* Clock time of the next train, and a bar that drains to empty as it leaves */
+.dep-strip{flex-shrink:0;margin-bottom:18px;transition:opacity .4s ease}
+.dep-strip.est{opacity:.5}
+.dep-strip.none{visibility:hidden}
+.dep-line{display:flex;align-items:baseline;gap:12px;margin-bottom:9px}
+.dep-lbl{font-size:13px;letter-spacing:.24em}
+.dep-time{font-family:'Barlow Condensed';font-weight:600;font-size:34px;line-height:1;letter-spacing:.02em}
+.dep-track{height:5px;border-radius:3px;overflow:hidden}
+.dep-fill{height:100%;border-radius:3px;transition:width 1s linear}
+#tile0 .dep-lbl{color:#5a5f62}
+#tile1 .dep-lbl{color:#6b6a4a}
+#tile0 .dep-time{color:#c9ccc8}
+#tile1 .dep-time{color:#d8c579}
+#tile0 .dep-track{background:#1c1e20}
+#tile1 .dep-track{background:#2a2508}
+#tile0 .dep-fill{background:#65C100}
+#tile1 .dep-fill{background:#FFC72C}
+
 .then-row{display:flex;flex-direction:column;gap:10px;padding-top:14px;flex-shrink:0}
 #tile0 .then-row{border-top:1px solid #1c1e20}
 #tile1 .then-row{border-top:1px solid #2a2508}
@@ -133,7 +151,9 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
 .precip-bar.dry{background:#2a3a4a}
 .precip-axis{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.14em;color:#4f7aa3;margin-top:4px}
 
-.wx-tomorrow{border-top:1px solid #1c1e20;padding-top:11px;font-size:16px;letter-spacing:.1em;color:#565b5d;flex-shrink:0}
+.wx-tomorrow{border-top:1px solid #1c1e20;padding-top:11px;font-size:16px;letter-spacing:.1em;color:#565b5d;flex-shrink:0;
+  display:flex;justify-content:space-between;gap:12px;white-space:nowrap}
+.wx-sun{color:#8a7a52}
 
 /* ── OVERLAYS ────────────────────────────────────────────────────────── */
 #night{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 2s ease;z-index:50}
@@ -167,6 +187,10 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
           <span class="flap-unit">minutes</span>
         </div>
       </div>
+      <div class="dep-strip none" id="dep-0">
+        <div class="dep-line"><span class="dep-lbl">DEPARTS</span><span class="dep-time" id="dep-time-0">—</span></div>
+        <div class="dep-track"><div class="dep-fill" id="dep-fill-0"></div></div>
+      </div>
       <div class="then-row">
         <div class="then-row-top">
           <span class="tile-badge badge-scheduled" id="badge-0">—</span>
@@ -190,6 +214,10 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
           <svg width="34" height="34" viewBox="0 0 26 26" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linecap="round"><path d="M5 20a12 12 0 0 1 12-12"/><path d="M8 20a8 8 0 0 1 8-8"/><circle cx="6" cy="20" r="1.8" fill="#FFC72C" stroke="none"/></svg>
           <span class="flap-unit">minutes</span>
         </div>
+      </div>
+      <div class="dep-strip none" id="dep-1">
+        <div class="dep-line"><span class="dep-lbl">DEPARTS</span><span class="dep-time" id="dep-time-1">—</span></div>
+        <div class="dep-track"><div class="dep-fill" id="dep-fill-1"></div></div>
       </div>
       <div class="then-row">
         <div class="then-row-top">
@@ -245,7 +273,7 @@ body{font-family:'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased}
             <div class="precip-axis" id="precip-axis" hidden><span>NOW</span><span>30M</span><span>1H</span><span>1H30</span><span>2H</span></div>
           </div>
         </div>
-        <div class="wx-tomorrow" id="wx-tomorrow"></div>
+        <div class="wx-tomorrow"><span id="wx-tomorrow"></span><span class="wx-sun" id="wx-sun"></span></div>
       </div>
     </div>
   </div>
@@ -458,28 +486,13 @@ function uvLevel(uv) { return uv<=2?"Low":uv<=5?"Moderate":uv<=7?"High":uv<=10?"
 function uvColor(uv) { return uv<=2?"120,200,80":uv<=5?"240,190,40":uv<=7?"245,140,40":uv<=10?"240,80,80":"180,110,230"; }
 
 /* ── SUN ARC ─────────────────────────────────────────────────────── */
-function updateSunArc(sunrise, sunset) {
-  if (!sunrise||!sunset) return;
-  const riseDate=new Date(sunrise), setDate=new Date(sunset), now=new Date();
-  const fmt=dt=>{ const h=dt.getHours()%12||12, m=String(dt.getMinutes()).padStart(2,'0'); return h+':'+m; };
-  const g=id=>document.getElementById(id);
-  g('arc-rise').textContent=fmt(riseDate);
-  g('arc-set').textContent=fmt(setDate);
-  const ms=setDate-riseDate;
-  const dh=Math.floor(ms/3600000), dm=Math.floor((ms%3600000)/60000);
-  g('arc-daylight').textContent=dh+'h '+dm+'m DAYLIGHT';
-  let t=Math.max(0,Math.min(1,(now-riseDate)/(setDate-riseDate)));
-  const bx=(1-t)*(1-t)*8+2*(1-t)*t*150+t*t*292;
-  const by=(1-t)*(1-t)*74+2*(1-t)*t*(-6)+t*t*74;
-  const dot=g('sun-dot'), prog=g('sun-progress');
-  const visible=now>=riseDate&&now<=setDate;
-  dot.style.display=visible?'':'none';
-  prog.style.display=visible?'':'none';
-  if (visible) {
-    dot.setAttribute('cx',Math.round(bx));
-    dot.setAttribute('cy',Math.round(by));
-    prog.setAttribute('stroke-dasharray',Math.round(t*300)+' 400');
-  }
+// The next sunrise or sunset: sunset until it happens, then tomorrow's sunrise.
+function sunLine(daily, now) {
+  const sunsets=(daily?.sunset||[]).map(x=>new Date(x)), sunrises=(daily?.sunrise||[]).map(x=>new Date(x));
+  const fmt=d=>d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}).replace(' ','\u2009');
+  const nextSet=sunsets.find(d=>d>now), nextRise=sunrises.find(d=>d>now);
+  if (!nextSet&&!nextRise) return '';
+  return (!nextRise||(nextSet&&nextSet<nextRise))?`SUNSET ${fmt(nextSet)}`:`SUNRISE ${fmt(nextRise)}`;
 }
 
 /* ── WEATHER ─────────────────────────────────────────────────────── */
@@ -584,6 +597,7 @@ async function loadWeather() {
       const tmrCode=daily?.weather_code?.[1];
       const WX_EMOJI={0:'☀',1:'☀',2:'⛅',3:'☁',45:'🌫',48:'🌫',51:'🌦',53:'🌦',55:'🌧',61:'🌦',63:'🌧',65:'🌧',71:'🌨',73:'🌨',75:'🌨',80:'🌦',81:'🌧',82:'🌧',95:'⛈',96:'⛈',99:'⛈'};
       if (!isNaN(tmrHi)) g('wx-tomorrow').textContent=`TMRW ${WX_EMOJI[tmrCode]||'☀'} ${tmrHi}° · ↓${tmrLo}°`;
+      g('wx-sun').textContent=sunLine(daily,new Date());
     }
 
   } catch(e) { console.warn("weather failed:",e.message); }
@@ -685,10 +699,12 @@ function render() {
       flapNumEl.textContent='—'; flapNumEl.classList.remove('urgent');
       badgeEl.className='tile-badge badge-scheduled'; badgeEl.textContent='NO SVC';
       thenEl.textContent=hint||'—';
+      renderDeparture(i,null,now);
       return;
     }
 
     const first=blended[0];
+    renderDeparture(i,first,now);
     const val=String(Math.max(0,first.mins));
     if (flapNumEl.dataset.val!==val) {
       flapNumEl.classList.remove('flip'); void flapNumEl.offsetWidth;
@@ -720,6 +736,21 @@ function render() {
   });
 
   applyNight();
+}
+
+/* The departure strip: clock time of the next train, and a bar that's full
+   DEP_BAR_MINUTES or more out and drains to empty as the train leaves. */
+const DEP_BAR_MINUTES=15;
+function renderDeparture(i, train, now) {
+  const strip=document.getElementById('dep-'+i);
+  if (!strip) return;
+  strip.classList.toggle('none',!train);
+  if (!train) return;
+  strip.classList.toggle('est',!!train.scheduled);
+  document.getElementById('dep-time-'+i).textContent=
+    train.arrival.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
+  const left=Math.max(0,Math.min(1,(train.arrival-now)/(DEP_BAR_MINUTES*60000)));
+  document.getElementById('dep-fill-'+i).style.width=(left*100).toFixed(2)+'%';
 }
 
 function applyNight() {
