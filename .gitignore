@@ -4,3 +4,7 @@
 # Local schedule deliverables / scrape artifacts — not part of the deployed app
 *.xlsx
 *.model.json
+
+# Local signed builds, provisioning metadata, and install history
+ios/.device-build/
+__pycache__/

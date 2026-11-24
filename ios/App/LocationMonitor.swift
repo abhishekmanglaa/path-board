@@ -2,162 +2,196 @@ import CoreLocation
 import UIKit
 import WidgetKit
 
-/// Keeps the widget following you without the app open.
-///
-/// With "Always" access, iOS relaunches the app in the background on two kinds of
-/// events: significant movement (~500 m, cell-tower based, near-zero battery) and
-/// entering/leaving a geofence around each PATH station. Each wakeup stores the
-/// new fix for the widget and asks WidgetKit to rebuild its timeline. While the
-/// app is open it follows you continuously, so a move shows up right away.
 @MainActor
 final class LocationMonitor: NSObject, ObservableObject {
     static let shared = LocationMonitor()
-
     @Published private(set) var authorization: CLAuthorizationStatus
     @Published private(set) var plan: Plan?
     @Published private(set) var error: String?
-    /// The last fix was nowhere near PATH.
     @Published private(set) var isFarAway = false
     @Published private(set) var isRefreshing = false
-    private var isFollowing = false
-    /// The next plan refetches trains even if a fresh one exists for this spot.
-    private var forceNextPlan = false
+    @Published private(set) var selectedStationID: String?
+    @Published private(set) var nearbyStations: [Station] = []
+    @Published var followsInBackground = SharedStore.followsInBackground
 
     private let manager = CLLocationManager()
-    private static let stationRadius: CLLocationDistance = 300
-    /// While open, a move this far is worth a new plan (and maybe a new station).
-    private static let foregroundDistanceFilter: CLLocationDistance = 50
+    private let requests = LatestPlanRequest()
+    private let poller = ForegroundPoller()
+    private var isForeground = false
+    private var isFollowing = false
+    private var automaticRefresh = AutomaticRefreshGate()
+    private var widgetReloads = WidgetReloadGate()
 
     override private init() {
         authorization = manager.authorizationStatus
+        let authorized = [.authorizedAlways, .authorizedWhenInUse].contains(manager.authorizationStatus)
+        selectedStationID = SharedStore.selectedStationID ?? (authorized ? nil : Station.homeID)
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        manager.distanceFilter = Self.foregroundDistanceFilter
-        plan = SharedStore.lastPlan
-        startBackgroundMonitoringIfAllowed()
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.distanceFilter = 100
+        manager.pausesLocationUpdatesAutomatically = true
+        plan = SharedStore.plan(for: cacheKey)
+        configureBackgroundMonitoring()
     }
 
+    var cacheKey: String { selectedStationID ?? "automatic" }
     var hasAlways: Bool { authorization == .authorizedAlways }
     var hasAnyAccess: Bool { hasAlways || authorization == .authorizedWhenInUse }
+    var needsLocation: Bool { selectedStationID == nil && !hasAnyAccess }
+
+    func selectStation(_ id: String?) async {
+        requests.cancel()
+        selectedStationID = id
+        SharedStore.selectedStationID = id
+        plan = SharedStore.plan(for: cacheKey)
+        error = nil
+        isFarAway = false
+        if id == nil && !hasAnyAccess {
+            isRefreshing = false
+            if authorization == .notDetermined { manager.requestWhenInUseAuthorization() }
+            return
+        }
+        await refresh()
+    }
 
     func requestAccess() {
-        switch authorization {
-        case .notDetermined: manager.requestWhenInUseAuthorization()
-        // iOS only shows the Always upgrade prompt after When In Use is granted.
-        case .authorizedWhenInUse: manager.requestAlwaysAuthorization()
-        default:
-            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-        }
+        if authorization == .notDetermined { manager.requestWhenInUseAuthorization() }
+        else if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
     }
 
-    /// Refetches trains (never served from the reuse window) for where you are now.
-    func refresh() {
-        guard hasAnyAccess else { return }
-        isRefreshing = true
-        forceNextPlan = true
-        // While following, iOS ignores one-shot requests and only reports moves, so
-        // plan from the fix it's already tracking.
-        if isFollowing, let here = manager.location {
-            Task { await handle(here) }
-        } else if !isFollowing {
-            manager.requestLocation()
+    func setBackgroundFollowing(_ enabled: Bool) {
+        followsInBackground = enabled
+        SharedStore.followsInBackground = enabled
+        if enabled {
+            switch authorization {
+            case .notDetermined: manager.requestWhenInUseAuthorization()
+            case .authorizedWhenInUse: manager.requestAlwaysAuthorization()
+            default: break
+            }
         }
-        // Following without a fix yet: the first one is on its way and will be forced.
+        configureBackgroundMonitoring()
     }
 
-    /// Continuous updates only while the app is on screen; in the background the
-    /// cheap significant-change and geofence events take over.
+    func refresh(forceFresh: Bool = true, userInitiated: Bool = true) async {
+        guard isForeground, !Task.isCancelled else { return }
+        let fix = hasAnyAccess ? SharedStore.freshestLocation(manager.location) : nil
+        guard selectedStationID != nil || fix != nil else {
+            isRefreshing = false
+            if hasAnyAccess { manager.requestLocation() }
+            return
+        }
+        await load(from: fix, forceFresh: forceFresh, userInitiated: userInitiated)
+    }
+
     func setForeground(_ active: Bool) {
-        guard hasAnyAccess else { return }
+        isForeground = active
+        poller.stop()
         if active {
-            if !isFollowing {
+            automaticRefresh = AutomaticRefreshGate()
+            if hasAnyAccess && !isFollowing {
                 isFollowing = true
                 manager.startUpdatingLocation()
             }
-            refresh()
+            poller.start(immediately: true, nextInterval: { [weak self] in
+                self?.automaticRefresh.delay(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled) ?? .seconds(30)
+            }) { [weak self] in await self?.refresh(userInitiated: false) }
         } else {
             isFollowing = false
             manager.stopUpdatingLocation()
-        }
-    }
-
-    private func startBackgroundMonitoringIfAllowed() {
-        guard hasAlways else { return }
-        manager.startMonitoringSignificantLocationChanges()
-        // Regions persist across launches; replace any whose station has moved.
-        var monitored: Set<String> = []
-        for case let region as CLCircularRegion in manager.monitoredRegions {
-            if let station = Station.byID[region.identifier],
-               region.center.latitude == station.latitude, region.center.longitude == station.longitude {
-                monitored.insert(region.identifier)
-            } else {
-                manager.stopMonitoring(for: region)
-            }
-        }
-        for station in Station.all where !monitored.contains(station.id) {
-            let region = CLCircularRegion(center: station.coordinate, radius: Self.stationRadius, identifier: station.id)
-            region.notifyOnEntry = true
-            region.notifyOnExit = true
-            manager.startMonitoring(for: region)
-        }
-    }
-
-    private func handle(_ location: CLLocation) async {
-        SharedStore.lastLocation = location
-        // Background wakeups get ~10s; ask for a little more so the fetch can finish.
-        let task = UIApplication.shared.beginBackgroundTask(withName: "plan")
-        defer {
-            WidgetCenter.shared.reloadAllTimelines()
-            UIApplication.shared.endBackgroundTask(task)
+            requests.cancel()
             isRefreshing = false
         }
-        let force = forceNextPlan
-        forceNextPlan = false
+    }
+
+    private func configureBackgroundMonitoring() {
+        // Remove station geofences registered by earlier builds.
+        for region in manager.monitoredRegions where Station.byID[region.identifier] != nil {
+            manager.stopMonitoring(for: region)
+        }
+        guard hasAlways && followsInBackground else {
+            manager.stopMonitoringSignificantLocationChanges()
+            return
+        }
+        manager.startMonitoringSignificantLocationChanges()
+    }
+
+    private func load(from fix: CLLocation?, forceFresh: Bool, userInitiated: Bool = false) async {
+        guard isForeground, automaticRefresh.begin(at: Date(), lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                                     userInitiated: userInitiated) else { return }
+        let key = cacheKey
+        let selected = selectedStationID
+        let previous = SharedStore.plan(for: key)
+        isRefreshing = true
         do {
-            let plan = try await Planner.plan(from: location, forceFresh: force)
-            SharedStore.lastPlan = plan
-            self.plan = plan
+            guard let value = try await requests.run({
+                try await Planner.plan(from: fix, stationID: selected, previous: previous, forceFresh: forceFresh)
+            }) else { return }
+            let stationChanged = plan?.stationID != value.stationID
+            SharedStore.save(value, for: key)
+            plan = value
             error = nil
             isFarAway = false
+            isRefreshing = false
+            // Planner returns the existing plan unchanged on cache reuse.
+            automaticRefresh.succeeded(fetchedNewPlan: value.computedAt != previous?.computedAt)
+            reloadWidgets(immediate: userInitiated || stationChanged)
+            await CommuteActivityController.shared.update(using: value)
         } catch PlanError.farFromPATH {
+            let changed = !isFarAway
             isFarAway = true
+            plan = nil
             error = nil
+            isRefreshing = false
+            reloadWidgets(immediate: userInitiated || changed)
         } catch {
-            self.error = error.localizedDescription
+            automaticRefresh.failed()
+            self.error = "Couldn't update departures. Check your connection and try again."
+            isRefreshing = false
         }
+    }
+
+    private func reloadWidgets(immediate: Bool) {
+        if widgetReloads.shouldReload(at: Date(), immediate: immediate) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    private func received(_ fix: CLLocation) async {
+        guard isForeground || (hasAlways && followsInBackground) else { return }
+        guard fix.horizontalAccuracy >= 0, fix.horizontalAccuracy <= 200,
+              abs(fix.timestamp.timeIntervalSinceNow) <= 300 else { return }
+        SharedStore.lastLocation = fix
+        // A background location callback only supplies the widget's cached fix.
+        guard isForeground else { return }
+        nearbyStations = Array(Station.all.sorted { $0.location.distance(from: fix) < $1.location.distance(from: fix) }.prefix(3))
+        await load(from: fix, forceFresh: false)
     }
 }
 
 extension LocationMonitor: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            authorization = manager.authorizationStatus
-            startBackgroundMonitoringIfAllowed()
-            // Access granted while on screen: start following now, not on the next launch.
-            setForeground(UIApplication.shared.applicationState == .active)
+            let updated = manager.authorizationStatus
+            guard updated != authorization else { return }
+            authorization = updated
+            configureBackgroundMonitoring()
+            if followsInBackground && authorization == .authorizedWhenInUse { manager.requestAlwaysAuthorization() }
+            setForeground(isForeground || UIApplication.shared.applicationState == .active)
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let latest = locations.last else { return }
-        Task { @MainActor in await handle(latest) }
+        Task { @MainActor in await received(latest) }
     }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        // The geofence event itself is coarse; get a precise fix for the walk time.
-        manager.requestLocation()
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        manager.requestLocation()
-    }
-
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
+            guard isForeground else { return }
+            guard (error as? CLError)?.code != .locationUnknown else { return }
             isRefreshing = false
-            if (error as? CLError)?.code != .locationUnknown { self.error = "Location unavailable" }
+            if selectedStationID == nil { self.error = "Location unavailable. Choose a station to see departures." }
         }
     }
 }

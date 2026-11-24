@@ -20,12 +20,16 @@ final class RenderTests: XCTestCase {
     private func scenarios() -> [(String, BoardState)] {
         let wtc = { (m: Double) in Departure(date: self.now.addingTimeInterval(m * 60 + 30), headsign: "World Trade Center", lineColors: "65C100") }
         let s33 = { (m: Double) in Departure(date: self.now.addingTimeInterval(m * 60 + 30), headsign: "33rd Street", lineColors: "FF9900") }
+        let homebound = Departure(date: now.addingTimeInterval(6 * 60), headsign: "Journal Square", lineColors: "FF9900")
+        let hoboken = Departure(date: now.addingTimeInterval(4 * 60), headsign: "Hoboken", lineColors: "4D92FB")
         func plan(_ id: String, walk: Double, _ deps: [Departure]) -> Plan {
             let st = Station.byID[id]!
             return Plan(stationID: id, walkSeconds: walk * 60, departures: deps, computedAt: now,
                         originLatitude: st.latitude, originLongitude: st.longitude)
         }
         return [
+            ("penn-two-both-lines", .plan(plan("33S", walk: 6, Planner.withTimetable([hoboken, homebound], at: Station.byID["33S"]!, now: now)))),
+            ("penn-two-hoboken-between-postings", .plan(plan("33S", walk: 6, Planner.withTimetable([homebound], at: Station.byID["33S"]!, now: now)))),
             ("away-three", .plan(.sample(at: now, stationID: "33S", walkMinutes: 4, minutes: [4, 14, 104]))),
             ("away-viahob", .plan(.sample(at: now, stationID: "33S", walkMinutes: 2, minutes: [5, 25],
                                           colors: "4D92FB,FF9900", headsign: "Journal Square via Hoboken"))),
@@ -114,6 +118,14 @@ final class RenderTests: XCTestCase {
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let home = scenarios().first { $0.0 == "home" }!.1
         var all: [(String, BoardState, [String])] = scenarios().map { ($0.0, $0.1, Destination.defaultNewportIDs) }
+        if case .plan(var newport) = home {
+            newport.locationDate = now.addingTimeInterval(-420)
+            newport.serviceAlerts = ServiceAlertSnapshot(fetchedAt: now, alerts: [
+                ServiceAlert(id: "preview", title: "Hoboken–WTC service advisory", message: "Check platform signs.",
+                             publishedAt: now, routes: [.hobokenWTC], stationIDs: [], systemWide: false)
+            ])
+            all.append(("newport-saved-walk", .plan(newport), Destination.newport.map(\.id)))
+        }
         all.append(("home-all-four", home, Destination.newport.map(\.id)))
         all.append(("home-wtc-only", home, ["WTC"]))
         for (name, state, ids) in all {
@@ -126,6 +138,69 @@ final class RenderTests: XCTestCase {
             glass.scale = 2
             try XCTUnwrap(glass.uiImage?.pngData(), name)
                 .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name)-glass.png"))
+        }
+    }
+
+    func testRenderAppAndActivityStates() throws {
+        guard let dir = ProcessInfo.processInfo.environment["RENDER_DIR"] else {
+            throw XCTSkip("set TEST_RUNNER_RENDER_DIR to render app and Live Activity states")
+        }
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let plan = Plan.sample(at: now, stationID: "CHR", walkMinutes: 6, minutes: [4, 10, 20])
+        for width: CGFloat in [320, 393] {
+            for large in [false, true] {
+                let content = VStack(alignment: .leading, spacing: 18) {
+                    Text("Train Home").font(.largeTitle.bold())
+                    Text("Christopher Street").font(.title2.bold())
+                    CommuteDashboard(plan: plan, now: now)
+                }
+                .padding(20).frame(width: width)
+                .background(Color(uiColor: .systemGroupedBackground))
+                .environment(\.colorScheme, .light)
+                .environment(\.dynamicTypeSize, large ? .accessibility3 : .large)
+                let renderer = ImageRenderer(content: content)
+                renderer.scale = 2
+                let data = try XCTUnwrap(renderer.uiImage?.pngData())
+                try data.write(to: URL(fileURLWithPath: dir).appendingPathComponent("app-\(Int(width))-\(large ? "large" : "normal").png"))
+            }
+        }
+        for (name, date, offline, hasWalk) in [("expired", now.addingTimeInterval(301), false, true),
+                                             ("offline", now, true, true), ("no-location", now, false, false)] {
+            var state = plan
+            state.walkIsKnown = hasWalk
+            let renderer = ImageRenderer(content: CommuteDashboard(plan: state, now: date, offline: offline)
+                .padding(20).frame(width: 393).background(Color(uiColor: .systemGroupedBackground)).environment(\.colorScheme, .dark))
+            renderer.scale = 2
+            try XCTUnwrap(renderer.uiImage?.pngData()).write(to: URL(fileURLWithPath: dir).appendingPathComponent("app-\(name).png"))
+        }
+        let livePlan = Plan.sample(at: Date(), stationID: "CHR", walkMinutes: 6, minutes: [4, 10, 20])
+        let recommendation = try XCTUnwrap(CommuteRecommendation.make(plan: livePlan, now: Date(), bufferMinutes: 2))
+        let state = CommuteActivity.ContentState(recommendation: recommendation, plan: livePlan)
+        for stale in [false, true] {
+            let renderer = ImageRenderer(content: CommuteActivityCard(state: state, stationName: "Christopher Street", isStale: stale)
+                .frame(width: 393).background(Color(uiColor: .secondarySystemBackground)))
+            renderer.scale = 2
+            try XCTUnwrap(renderer.uiImage?.pngData()).write(to: URL(fileURLWithPath: dir).appendingPathComponent("activity-\(stale ? "stale" : "fresh").png"))
+        }
+        let options = WidgetOptions(stationID: "CHR", recommends: true)
+        let renderer = ImageRenderer(content: ConfiguredBoard(entry: BoardEntry(date: now, state: .plan(plan), options: options), family: .systemSmall)
+            .padding(16).frame(width: 170, height: 170).background(Color.white))
+        renderer.scale = 2
+        try XCTUnwrap(renderer.uiImage?.pngData()).write(to: URL(fileURLWithPath: dir).appendingPathComponent("widget-recommendation.png"))
+    }
+
+    func testLiveActivityFitsLockScreenHeight() throws {
+        let date = Date()
+        let plan = Plan.sample(at: date, stationID: "CHR", walkMinutes: 6, minutes: [12])
+        let recommendation = try XCTUnwrap(CommuteRecommendation.make(plan: plan, now: date, bufferMinutes: 2))
+        let state = CommuteActivity.ContentState(recommendation: recommendation, plan: plan)
+        for width: CGFloat in [320, 393] {
+            for stale in [false, true] {
+                let renderer = ImageRenderer(content: CommuteActivityCard(state: state, stationName: "Christopher Street", isStale: stale)
+                    .frame(width: width))
+                let size = try XCTUnwrap(renderer.uiImage).size
+                XCTAssertLessThanOrEqual(size.height, 130, "Reserve 30 points for the End tracking control within the 160pt Lock Screen limit")
+            }
         }
     }
 }

@@ -1,25 +1,17 @@
 import AppIntents
-import CoreLocation
-import WidgetKit
 
-/// The widget's refresh button. Runs in the widget's process: it computes a
-/// fresh plan (skipping the "reuse a plan under a minute old" shortcut, since a
-/// tap means "get me new times"), saves it, and WidgetKit reloads the timeline
-/// right after `perform` returns — which then reuses this plan instead of
-/// fetching again.
 struct RefreshTrainsIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Trains"
-    static var description = IntentDescription("Fetches the latest PATH departures for the widget.")
+    static var description = IntentDescription("Fetches fresh departures for this widget's station.")
     static var isDiscoverable = false
+    @Parameter(title: "Station") var stationID: String
+
+    init() { stationID = "" }
+    init(stationID: String) { self.stationID = stationID }
 
     func perform() async throws -> some IntentResult {
-        let manager = CLLocationManager()
-        let fix = manager.isAuthorizedForWidgetUpdates ? manager.location : nil
-        // Only a success replaces the saved plan: a failed refresh must leave the
-        // last good one for the widget to fall back on.
-        if let here = SharedStore.freshestLocation(fix), let plan = try? await Planner.plan(from: here, forceFresh: true) {
-            SharedStore.lastPlan = plan
-        }
+        let options = WidgetOptions(stationID: stationID.isEmpty ? nil : stationID)
+        _ = try? await WidgetPlanRefresh.load(options: options, forceFresh: true)
         return .result()
     }
 }

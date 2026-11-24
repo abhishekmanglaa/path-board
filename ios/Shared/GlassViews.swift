@@ -11,15 +11,19 @@ struct GlassBoardView: View {
     var showing: [Destination] = SharedStore.newportDestinations
 
     var body: some View {
+        content.environment(\.refreshStationID, entry.options.stationID ?? "")
+    }
+
+    @ViewBuilder private var content: some View {
         switch entry.state {
         case .plan(let plan):
             GlassPlanView(snap: BoardSnapshot(plan: plan, at: entry.date, showing: showing), family: family, stale: false)
         case .failed(_, let stale?):
-            GlassPlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing), family: family, stale: true)
+            GlassPlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing, offline: true), family: family, stale: true)
         case .failed:
             GlassMessage(icon: "exclamationmark.triangle.fill", text: "Trains unavailable")
         case .needsLocation:
-            GlassMessage(icon: "location.slash.fill", text: "Open PATH Home to share your location")
+            GlassMessage(icon: "location.slash.fill", text: "Open PATH Home for your location", offersRefresh: true)
         case .farAway:
             GlassMessage(icon: "map", text: PlanError.farFromPATH.localizedDescription)
         }
@@ -48,6 +52,8 @@ struct RingCell: Hashable, Identifiable {
     /// Trains after this one, for the medium size.
     let after: [Int]
     let color: Color
+    var savedWalk = false
+    var hasAlert = false
 
     /// Rings span this many minutes: full at 20+, empty as the train arrives.
     static let span = 20.0
@@ -57,15 +63,19 @@ struct RingCell: Hashable, Identifiable {
     /// first direction's later trains, so a station with one line still shows
     /// three times (the medium size lists later trains under each ring instead).
     static func cells(_ snap: BoardSnapshot, count: Int, fill: Bool) -> [RingCell] {
-        var cells = [RingCell(id: "walk", kind: .walk, minutes: snap.walkMinutes, label: "walk",
-                              after: [], color: Theme.walk)]
+        var cells = snap.hasWalk ? [RingCell(id: "walk", kind: .walk, minutes: snap.walkMinutes, label: "walk",
+                              after: [], color: Theme.walk, savedWalk: snap.isSavedWalk)] : []
         for row in snap.rows {
             cells.append(RingCell(id: row.id, kind: .train(scheduled: row.next.scheduled), minutes: row.next.minutes,
-                                  label: row.tiny, after: row.trains.dropFirst().map(\.minutes), color: row.line.color))
+                                  label: row.tiny, after: row.trains.dropFirst().map(\.minutes), color: row.line.color,
+                                  hasAlert: row.alertScope != nil))
         }
         if fill, let first = snap.rows.first {
             // Later trains get rings of their own, so don't also list them underneath.
-            cells = cells.map { RingCell(id: $0.id, kind: $0.kind, minutes: $0.minutes, label: $0.label, after: [], color: $0.color) }
+            cells = cells.map { cell in
+                RingCell(id: cell.id, kind: cell.kind, minutes: cell.minutes, label: cell.label,
+                    after: [], color: cell.color, savedWalk: cell.savedWalk, hasAlert: cell.hasAlert)
+            }
             for (i, t) in first.trains.dropFirst().enumerated() where cells.count < count {
                 cells.append(RingCell(id: "\(first.id)+\(i)", kind: .train(scheduled: t.scheduled), minutes: t.minutes,
                                       label: "then", after: [], color: first.line.color))
@@ -81,16 +91,21 @@ private struct GlassPlanView: View {
     let stale: Bool
 
     var body: some View {
-        switch family {
-        case .systemMedium: medium
-        default: small
+        VStack(spacing: 4) {
+            switch family {
+            case .systemMedium: medium
+            default: small
+            }
+            WidgetTrustLabel(freshness: snap.freshness, offline: stale, alerts: snap.serviceAlerts)
         }
     }
 
     private var small: some View {
         let cells = RingCell.cells(snap, count: 4, fill: true)
         return Group {
-            if cells.count == 1 {
+            if cells.isEmpty {
+                GlassMessage(icon: "tram.fill", text: "No trains posted yet")
+            } else if cells.count == 1 && cells[0].kind == .walk {
                 VStack(spacing: 8) {
                     Ring(cell: cells[0])
                     Text("No trains posted").font(Theme.rounded(12, .heavy)).foregroundStyle(.secondary)
@@ -105,7 +120,7 @@ private struct GlassPlanView: View {
                 }
             }
         }
-        .overlay(alignment: .topTrailing) { if stale { StaleDot() } }
+        .overlay(alignment: .topTrailing) { if stale || snap.freshness != .fresh { StaleDot() } }
     }
 
     @ViewBuilder private func cell(_ cells: [RingCell], _ i: Int) -> some View {
@@ -118,11 +133,13 @@ private struct GlassPlanView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text(snap.station.name).font(Theme.rounded(15, .heavy)).lineLimit(1).minimumScaleFactor(0.8)
-                if stale { StaleDot() }
+                if stale || snap.freshness != .fresh { StaleDot() }
                 Spacer(minLength: 4)
                 GlassRefreshButton()
             }
-            if cells.count == 1 {
+            if cells.isEmpty {
+                GlassMessage(icon: "tram.fill", text: "No trains posted yet")
+            } else if cells.count == 1 && cells[0].kind == .walk {
                 HStack(spacing: 12) {
                     Ring(cell: cells[0]).frame(width: 70)
                     Text("No trains posted yet").font(Theme.rounded(14, .heavy)).foregroundStyle(.secondary)
@@ -174,7 +191,7 @@ private struct Ring: View {
                     if case .walk = cell.kind {
                         Image(systemName: "figure.walk").font(.system(size: d * 0.2, weight: .heavy))
                     }
-                    Text("\(cell.minutes)")
+                    Text("\(cell.savedWalk ? "~" : "")\(cell.minutes)")
                         .font(Theme.rounded(d * (cell.kind == .walk ? 0.26 : 0.34), .black))
                         .contentTransition(.numericText(countsDown: true))
                         .invalidatableContent()
@@ -190,9 +207,12 @@ private struct Ring: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .aspectRatio(1, contentMode: .fit)
+        .overlay(alignment: .topTrailing) {
+            if cell.hasAlert { ServiceAlertGlyph() }
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(cell.kind == .walk ? "\(cell.minutes) minute walk"
-                            : "\(cell.label) in \(cell.minutes) minutes\(scheduled ? ", scheduled" : "")")
+        .accessibilityLabel(cell.kind == .walk ? "\(cell.savedWalk ? "Last estimate, " : "")\(cell.minutes) minute walk"
+                            : "\(cell.label) in \(cell.minutes) minutes\(scheduled ? ", scheduled" : "")\(cell.hasAlert ? ", service alert" : "")")
     }
 
     private var scheduled: Bool { cell.kind == .train(scheduled: true) }
@@ -206,8 +226,9 @@ private struct StaleDot: View {
 }
 
 private struct GlassRefreshButton: View {
+    @Environment(\.refreshStationID) private var stationID
     var body: some View {
-        Button(intent: RefreshTrainsIntent()) {
+        Button(intent: RefreshTrainsIntent(stationID: stationID)) {
             Image(systemName: "arrow.clockwise")
                 .font(Theme.rounded(11, .heavy))
                 .foregroundStyle(.white.opacity(0.8))
@@ -222,10 +243,17 @@ private struct GlassRefreshButton: View {
 private struct GlassMessage: View {
     let icon: String
     let text: String
+    var offersRefresh = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: icon).font(Theme.rounded(20, .heavy)).foregroundStyle(.orange)
+            HStack {
+                Image(systemName: icon).font(Theme.rounded(20, .heavy)).foregroundStyle(.orange)
+                if offersRefresh {
+                    Spacer(minLength: 0)
+                    GlassRefreshButton()
+                }
+            }
             Spacer(minLength: 0)
             Text(text).font(Theme.rounded(13, .bold)).foregroundStyle(.white).lineLimit(4).minimumScaleFactor(0.8)
         }

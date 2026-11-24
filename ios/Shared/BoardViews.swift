@@ -13,11 +13,13 @@ enum BoardState {
 struct BoardEntry: TimelineEntry {
     let date: Date
     let state: BoardState
+    var options = WidgetOptions()
 
     /// Smart Stack ranking: rises as the next train gets close to the walk time,
     /// so a stack rotates the train widget to the top when it actually matters.
     var relevance: TimelineEntryRelevance? {
-        guard case .plan(let plan) = state, let next = BoardSnapshot(plan: plan, at: date).next else {
+        guard case .plan(let plan) = state, plan.freshness(at: date) == .fresh,
+              plan.hasReliableWalk(at: date), let next = BoardSnapshot(plan: plan, at: date).next else {
             return TimelineEntryRelevance(score: 0)
         }
         let slack = next.minutes - plan.walkMinutes
@@ -34,6 +36,7 @@ struct BoardSnapshot {
         /// Whole minutes until it leaves, rounded up the way PATH's own signs and
         /// the RidePATH app count.
         let minutes: Int
+        var isLive = true
 
         var scheduled: Bool { departure.scheduled }
     }
@@ -45,6 +48,7 @@ struct BoardSnapshot {
         /// For the small widget's narrow rows.
         let tiny: String
         let trains: [Train]
+        var alertScope: String? = nil
 
         var line: PathLine { trains[0].departure.line }
         var next: Train { trains[0] }
@@ -55,25 +59,50 @@ struct BoardSnapshot {
     let station: Station
     let walkMinutes: Int
     let rows: [Row]
+    let hasWalk: Bool
+    let isSavedWalk: Bool
+    let freshness: PlanFreshness
+    let serviceAlerts: ServiceAlertPresentation
 
-    init(plan: Plan, at date: Date, showing destinations: [Destination] = SharedStore.newportDestinations) {
+    init(plan: Plan, at date: Date, showing destinations: [Destination] = SharedStore.newportDestinations, offline: Bool = false) {
         station = plan.station
         walkMinutes = plan.walkMinutes
+        hasWalk = plan.hasDisplayWalk(at: date)
+        isSavedWalk = hasWalk && !plan.hasReliableWalk(at: date)
+        freshness = plan.freshness(at: date)
         let upcoming = plan.upcoming(at: date)
-        func train(_ d: Departure) -> Train { Train(departure: d, minutes: Self.minutes(from: date, to: d.date)) }
+        let notices = plan.serviceAlertPresentation(at: date, showing: destinations)
+        serviceAlerts = notices
+        func makeRow(id: String, label: String, tiny: String, trains: [Train]) -> Row {
+            let context = ServiceAlertContext(station: plan.station, destinations: destinations,
+                departures: trains.map(\.departure), rowID: id)
+            let scope = notices.alerts.first { $0.applies(to: context) }?.scope
+            return Row(id: id, label: label, tiny: tiny, trains: trains, alertScope: scope)
+        }
+        func train(_ d: Departure) -> Train {
+            Train(departure: d, minutes: Self.minutes(from: date, to: d.date),
+                  isLive: !d.scheduled && !offline && plan.freshness(at: date) == .fresh)
+        }
 
         if plan.station.isHome {
             // Fixed order, like RidePATH, so each direction stays where the eye expects it.
             rows = destinations.compactMap { dest in
                 let trains = upcoming.filter(dest.includes).prefix(Self.trainsPerRow).map(train)
-                return trains.isEmpty ? nil : Row(id: dest.id, label: dest.short, tiny: dest.tiny, trains: trains)
+                return trains.isEmpty ? nil : makeRow(id: dest.id, label: dest.short, tiny: dest.tiny, trains: trains)
             }
         } else {
-            // One row per line that gets you to Newport, soonest line first.
+            // One row per line. At the shared Manhattan stations, keep JSQ and
+            // Hoboken in fixed positions as live predictions come and go.
             var lines: [String] = []
             for d in upcoming where !lines.contains(d.line.shortName) { lines.append(d.line.shortName) }
+            let manhattan = HobokenSchedule.stationOffsets[plan.station.id] != nil
+            if manhattan {
+                let order = ["JSQ–33": 0, "HOB–33": 1]
+                lines.sort { (order[$0] ?? 2, $0) < (order[$1] ?? 2, $1) }
+            }
             rows = lines.map { name in
-                Row(id: name, label: name, tiny: name,
+                let tiny = manhattan ? ["JSQ–33": "JSQ", "HOB–33": "HOB"][name] ?? name : name
+                return makeRow(id: name, label: name, tiny: tiny,
                     trains: upcoming.filter { $0.line.shortName == name }.prefix(Self.trainsPerRow).map(train))
             }
         }
@@ -85,6 +114,7 @@ struct BoardSnapshot {
 
     /// The soonest train in any row.
     var next: Train? { rows.map(\.next).min { $0.departure.date < $1.departure.date } }
+    var walkLabel: String { "\(isSavedWalk ? "~" : "")\(walkMinutes) min" }
 }
 
 extension Station {
@@ -107,16 +137,20 @@ struct BoardView: View {
     var showing: [Destination] = SharedStore.newportDestinations
 
     var body: some View {
+        content.environment(\.refreshStationID, entry.options.stationID ?? "")
+    }
+
+    @ViewBuilder private var content: some View {
         switch entry.state {
         case .plan(let plan):
             PlanView(snap: BoardSnapshot(plan: plan, at: entry.date, showing: showing), family: family, stale: false)
         case .failed(_, let stale?):
-            PlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing), family: family, stale: true)
+            PlanView(snap: BoardSnapshot(plan: stale, at: entry.date, showing: showing, offline: true), family: family, stale: true)
         case .failed(let message, nil):
             MessageView(icon: "exclamationmark.triangle.fill", text: message, short: "Trains unavailable", family: family)
         case .needsLocation:
-            MessageView(icon: "location.slash.fill", text: "Open PATH Home to share your location",
-                        short: "Open app for location", family: family)
+            MessageView(icon: "location.slash.fill", text: "Open PATH Home for your location",
+                        short: "Open app for location", family: family, offersRefresh: true)
         case .farAway:
             MessageView(icon: "map", text: PlanError.farFromPATH.localizedDescription,
                         short: "No PATH nearby", family: family)
@@ -130,12 +164,16 @@ private struct PlanView: View {
     let stale: Bool
 
     var body: some View {
-        switch family {
-        case .accessoryInline: InlineView(snap: snap)
-        case .accessoryCircular: CircularView(snap: snap)
-        case .accessoryRectangular: RectangularView(snap: snap)
-        case .systemMedium: MediumView(snap: snap, stale: stale)
-        default: SmallView(snap: snap, stale: stale)
+        if (stale || snap.freshness != .fresh) && [.accessoryInline, .accessoryCircular, .accessoryRectangular].contains(family) {
+            MessageView(icon: "arrow.clockwise", text: "Open app to update train predictions", short: "Check train · open app", family: family)
+        } else {
+            switch family {
+            case .accessoryInline: InlineView(snap: snap)
+            case .accessoryCircular: CircularView(snap: snap)
+            case .accessoryRectangular: RectangularView(snap: snap)
+            case .systemMedium: MediumView(snap: snap, stale: stale)
+            default: SmallView(snap: snap, stale: stale)
+            }
         }
     }
 }
@@ -143,13 +181,13 @@ private struct PlanView: View {
 // MARK: - Home screen
 
 private struct WalkBadge: View {
-    let minutes: Int
+    let snap: BoardSnapshot
     let stale: Bool
 
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: "figure.walk").font(Theme.rounded(12, .heavy))
-            Text("\(minutes) min").font(Theme.rounded(13, .heavy))
+            Image(systemName: snap.hasWalk ? "figure.walk" : "tram.fill").font(Theme.rounded(12, .heavy))
+            Text(snap.hasWalk ? snap.walkLabel : "Trains").font(Theme.rounded(13, .heavy))
             if stale {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(Theme.rounded(11)).foregroundStyle(.orange)
@@ -158,8 +196,10 @@ private struct WalkBadge: View {
         }
         .foregroundStyle(Theme.walk)
         .lineLimit(1)
+        .minimumScaleFactor(0.8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(minutes) minute walk")
+        .accessibilityLabel(snap.hasWalk
+            ? "\(snap.isSavedWalk ? "Last estimate, " : "")\(snap.walkMinutes) minute walk" : "Walking time unavailable")
     }
 }
 
@@ -198,10 +238,10 @@ private struct SmallView: View {
     let stale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 4) {
                 VStack(alignment: .leading, spacing: 0) {
-                    WalkBadge(minutes: snap.walkMinutes, stale: stale)
+                    WalkBadge(snap: snap, stale: stale || snap.freshness != .fresh)
                     Text(snap.station.shortName)
                         .font(Theme.rounded(15, .heavy))
                         .lineLimit(1).minimumScaleFactor(0.7)
@@ -212,6 +252,7 @@ private struct SmallView: View {
             TrainList(rows: snap.rows, spacing: 4, height: 24) { row, height in
                 SmallRow(row: row, height: height)
             }
+            WidgetTrustLabel(freshness: snap.freshness, offline: stale, alerts: snap.serviceAlerts)
         }
     }
 }
@@ -228,6 +269,7 @@ private struct SmallRow: View {
                 .font(Theme.rounded(12, .black))
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .layoutPriority(1)
+            if row.alertScope != nil { ServiceAlertGlyph(color: paint.ink) }
             Spacer(minLength: 2)
             Times(trains: row.trains, size: 16, unit: false)
         }
@@ -236,7 +278,7 @@ private struct SmallRow: View {
         .frame(height: height)
         .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 8))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Times.spoken(row))
+        .accessibilityLabel(Times.spoken(row) + (row.alertScope == nil ? "" : ", service alert"))
     }
 }
 
@@ -251,12 +293,13 @@ private struct MediumView: View {
                     .font(Theme.rounded(16, .heavy))
                     .lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
-                WalkBadge(minutes: snap.walkMinutes, stale: stale)
+                WalkBadge(snap: snap, stale: stale || snap.freshness != .fresh)
                 RefreshButton()
             }
             TrainList(rows: snap.rows, spacing: 5, height: 28) { row, height in
                 MediumRow(row: row, home: snap.station.isHome, note: snap.station.note, height: height)
             }
+            WidgetTrustLabel(freshness: snap.freshness, offline: stale, alerts: snap.serviceAlerts)
         }
     }
 }
@@ -297,16 +340,20 @@ private struct MediumRow: View {
             Times(trains: row.trains, size: 18, unit: true)
                 .layoutPriority(1)
             // Space is reserved on every row so the minute column lines up.
-            RealtimeMark(color: paint.ink).frame(width: 9, height: 9)
-                .opacity(row.next.scheduled ? 0 : 1)
-                .accessibilityHidden(row.next.scheduled)
+            if row.alertScope != nil {
+                ServiceAlertGlyph(color: paint.ink)
+            } else {
+                RealtimeMark(color: paint.ink).frame(width: 9, height: 9)
+                    .opacity(row.next.isLive ? 1 : 0)
+                    .accessibilityHidden(!row.next.isLive)
+            }
         }
         .foregroundStyle(paint.ink)
         .padding(.horizontal, 10)
         .frame(height: height)
         .background(RowBackground(paint: paint, accent: row.line.accent, cornerRadius: 9))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Times.spoken(row))
+        .accessibilityLabel(Times.spoken(row) + (row.alertScope == nil ? "" : ", service alert"))
     }
 }
 
@@ -368,9 +415,8 @@ private struct CardPaint {
 
 }
 
-/// A row's fill, with a fixed-width stripe in the second color for combined
-/// overnight lines (full color only). Fixed width so it never reaches the text,
-/// however wide the row is.
+/// Combined service keeps its orange identity, with a stronger blue band and
+/// a short wash into the leading edge. The times stay over the main route fill.
 private struct RowBackground: View {
     let paint: CardPaint
     let accent: Color?
@@ -379,7 +425,16 @@ private struct RowBackground: View {
     var body: some View {
         ZStack(alignment: .leading) {
             paint.fill
-            if paint.isFullColor, let accent { accent.frame(width: 4) }
+            if paint.isFullColor, let accent {
+                LinearGradient(stops: [
+                    .init(color: accent, location: 0),
+                    .init(color: accent.opacity(0.85), location: 0.2),
+                    .init(color: accent.opacity(0.35), location: 0.65),
+                    .init(color: accent.opacity(0), location: 1),
+                ], startPoint: .leading, endPoint: .trailing)
+                .frame(width: 56)
+                accent.frame(width: 7)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
@@ -387,8 +442,9 @@ private struct RowBackground: View {
 
 /// Refetches trains in place (iOS 17 interactive widgets) without opening the app.
 private struct RefreshButton: View {
+    @Environment(\.refreshStationID) private var stationID
     var body: some View {
-        Button(intent: RefreshTrainsIntent()) {
+        Button(intent: RefreshTrainsIntent(stationID: stationID)) {
             Image(systemName: "arrow.clockwise")
                 .font(Theme.rounded(11, .heavy))
                 .foregroundStyle(.secondary)
@@ -423,6 +479,7 @@ private struct MessageView: View {
     /// For the inline lock screen slot, which fits ~20 characters.
     let short: String
     let family: WidgetFamily
+    var offersRefresh = false
 
     var body: some View {
         switch family {
@@ -440,7 +497,13 @@ private struct MessageView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         default:
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: icon).font(Theme.rounded(20, .heavy)).foregroundStyle(.orange)
+                HStack {
+                    Image(systemName: icon).font(Theme.rounded(20, .heavy)).foregroundStyle(.orange)
+                    if offersRefresh {
+                        Spacer(minLength: 0)
+                        RefreshButton()
+                    }
+                }
                 Spacer(minLength: 0)
                 Text(text).font(Theme.rounded(13, .bold))
                     .lineLimit(4).minimumScaleFactor(0.8)
@@ -464,7 +527,8 @@ private struct RectangularView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Label("\(snap.walkMinutes) min · \(snap.station.shortName)", systemImage: "figure.walk")
+            Label(snap.hasWalk ? "\(snap.walkLabel) · \(snap.station.shortName)" : snap.station.shortName,
+                  systemImage: snap.hasWalk ? "figure.walk" : "tram.fill")
                 .font(Theme.rounded(13, .semibold))
                 .lineLimit(1).minimumScaleFactor(0.8)
             if snap.rows.isEmpty {
@@ -473,6 +537,7 @@ private struct RectangularView: View {
             ForEach(snap.rows.prefix(2)) { row in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(row.tiny).font(Theme.rounded(13, .bold))
+                    if row.alertScope != nil { ServiceAlertGlyph() }
                     // As many departures as fit on the line.
                     ViewThatFits(in: .horizontal) {
                         ForEach((1...row.trains.count).reversed(), id: \.self) { n in
@@ -500,7 +565,7 @@ private struct InlineView: View {
             ViewThatFits(in: .horizontal) {
                 ForEach((1...snap.rows.count).reversed(), id: \.self) { n in
                     Label(snap.rows.prefix(n).map { "\($0.tiny) \($0.next.minutes)" }.joined(separator: " · ") + " min",
-                          systemImage: "tram.fill")
+                          systemImage: snap.serviceAlerts.alerts.isEmpty ? "tram.fill" : "exclamationmark.triangle.fill")
                 }
             }
         }
@@ -521,8 +586,11 @@ private struct CircularView: View {
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 .padding(.horizontal, 4)
+                .overlay(alignment: .topTrailing) {
+                    if row.alertScope != nil { ServiceAlertGlyph() }
+                }
             } else {
-                Image(systemName: "tram.fill").font(.title3)
+                Image(systemName: snap.serviceAlerts.alerts.isEmpty ? "tram.fill" : "exclamationmark.triangle.fill").font(.title3)
             }
         }
     }

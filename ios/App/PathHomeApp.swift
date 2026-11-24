@@ -19,8 +19,9 @@ struct PathHomeApp: App {
         WindowGroup {
             ContentView(monitor: .shared)
                 .onOpenURL(perform: open)
-                .onChange(of: scenePhase) { _, phase in
+                .onChange(of: scenePhase, initial: true) { _, phase in
                     LocationMonitor.shared.setForeground(phase == .active)
+                    if phase == .active { CommuteActivityController.shared.syncStatus() }
                 }
         }
     }

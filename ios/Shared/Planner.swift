@@ -37,6 +37,13 @@ struct Plan: Codable {
     /// Where the walk was measured from, so a nearby later fix can reuse it.
     let originLatitude: Double
     let originLongitude: Double
+    var walkIsKnown = true
+    var locationDate: Date? = nil
+    /// nil means automatic station selection; fixed-station plans never seed it.
+    var selectionID: String? = nil
+    var predictionDate: Date? = nil
+    var serviceAlerts: ServiceAlertSnapshot? = nil
+    var walkIsSaved = false
 
     var origin: CLLocation { CLLocation(latitude: originLatitude, longitude: originLongitude) }
 
@@ -47,7 +54,38 @@ struct Plan: Codable {
 
     /// Trains that haven't left yet, soonest first.
     func upcoming(at now: Date) -> [Departure] {
-        departures.filter { $0.date > now }
+        let predictionsExpired = freshness(at: now) == .expired
+        return departures.filter { departure in
+            guard departure.date > now else { return false }
+            if stationID == Station.homeID && departure.headsign.lowercased().hasPrefix("hoboken") {
+                return !departure.scheduled && !predictionsExpired
+            }
+            return true
+        }
+    }
+
+}
+
+extension Plan {
+    private enum CodingKeys: String, CodingKey {
+        case stationID, walkSeconds, departures, computedAt, originLatitude, originLongitude
+        case walkIsKnown, locationDate, selectionID, predictionDate, serviceAlerts, walkIsSaved
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stationID = try c.decode(String.self, forKey: .stationID)
+        walkSeconds = try c.decode(Double.self, forKey: .walkSeconds)
+        departures = try c.decode([Departure].self, forKey: .departures)
+        computedAt = try c.decode(Date.self, forKey: .computedAt)
+        originLatitude = try c.decode(Double.self, forKey: .originLatitude)
+        originLongitude = try c.decode(Double.self, forKey: .originLongitude)
+        walkIsKnown = try c.decodeIfPresent(Bool.self, forKey: .walkIsKnown) ?? true
+        locationDate = try c.decodeIfPresent(Date.self, forKey: .locationDate)
+        selectionID = try c.decodeIfPresent(String.self, forKey: .selectionID)
+        predictionDate = try c.decodeIfPresent(Date.self, forKey: .predictionDate)
+        serviceAlerts = try c.decodeIfPresent(ServiceAlertSnapshot.self, forKey: .serviceAlerts)
+        walkIsSaved = try c.decodeIfPresent(Bool.self, forKey: .walkIsSaved) ?? false
     }
 }
 
@@ -73,38 +111,88 @@ enum Planner {
     /// just computed it and asked the widget to reload.
     static let reuseWindow: TimeInterval = 60
 
+    struct Dependencies {
+        var fetch: () async throws -> PathFeed
+        var walk: (CLLocation, Station) async -> TimeInterval
+        var alerts: () async -> ServiceAlertSnapshot? = { nil }
+        static let live = Self(fetch: { try await fetchFeed() }, walk: { await walkSeconds(from: $0, to: $1) },
+                               alerts: { await ServiceAlertClient.current() })
+    }
+
     /// `forceFresh` (a refresh tap) always refetches trains, but still reuses the
     /// walk when you haven't moved.
-    static func plan(from here: CLLocation, previous: Plan? = SharedStore.lastPlan, now: Date = Date(),
-                     forceFresh: Bool = false) async throws -> Plan {
-        guard isNearPATH(here) else { throw PlanError.farFromPATH }
-        let sameSpot = previous.map { $0.origin.distance(from: here) < sameSpotMeters } ?? false
-        if let previous, sameSpot, !forceFresh, now.timeIntervalSince(previous.computedAt) < reuseWindow {
-            return previous
+    static func plan(from here: CLLocation?, stationID: String? = nil,
+                     previous: Plan? = SharedStore.lastPlan, now: Date = Date(),
+                     forceFresh: Bool = false, allowSavedLocation: Bool = false,
+                     dependencies: Dependencies = .live) async throws -> Plan {
+        let previous = previous.flatMap {
+            $0.selectionID == stationID && (stationID == nil || $0.stationID == stationID) ? $0 : nil
+        }
+        let savedWalk = allowSavedLocation && here == nil && previous?.hasDisplayWalk(at: now) == true ? previous : nil
+        let fixed = stationID.flatMap { Station.byID[$0] } ?? savedWalk?.station
+        if fixed == nil {
+            guard let here, isNearPATH(here) else { throw PlanError.farFromPATH }
+        }
+        let knownWalk = here.map { fix in
+            let age = now.timeIntervalSince(fix.timestamp)
+            return fix.horizontalAccuracy >= 0 && fix.horizontalAccuracy <= 200 && age >= -5 && age <= 300
+                && (fixed.map { $0.location.distance(from: fix) <= walkableMeters } ?? true)
+        } ?? false
+        let sameSpot = here.flatMap { fix in previous.map { $0.origin.distance(from: fix) < sameSpotMeters } } ?? false
+        let usingSavedWalk = savedWalk != nil
+        let sameContext = previous.map {
+            $0.walkIsKnown == (knownWalk || usingSavedWalk)
+                && $0.walkIsSaved == usingSavedWalk
+                && (sameSpot || !knownWalk)
+        } ?? false
+        if let previous, sameContext, !forceFresh, previous.freshness(at: now) == .fresh,
+           now.timeIntervalSince(previous.computedAt) >= 0, now.timeIntervalSince(previous.computedAt) < reuseWindow {
+            var cached = previous
+            cached.serviceAlerts = await dependencies.alerts() ?? cached.serviceAlerts
+            return cached
         }
 
-        async let feed = fetchFeed()
+        async let feed = dependencies.fetch()
+        async let alerts = dependencies.alerts()
         let (station, walk): (Station, TimeInterval)
-        if let previous, sameSpot {
+        if let fixed {
+            station = fixed
+            if let savedWalk, savedWalk.stationID == fixed.id {
+                walk = savedWalk.walkSeconds
+            } else if let previous, sameSpot, knownWalk, previous.walkIsKnown {
+                walk = previous.walkSeconds
+            } else if let here, knownWalk {
+                walk = await dependencies.walk(here, fixed)
+            } else { walk = 0 }
+        } else if let previous, sameSpot, knownWalk, previous.walkIsKnown {
             // Haven't moved: the walk is unchanged, only the trains need refreshing.
             (station, walk) = (previous.station, previous.walkSeconds)
         } else {
-            (station, walk) = await nearestByWalk(from: here)
+            (station, walk) = await nearestByWalk(from: here!, walk: dependencies.walk)
         }
         let fetched = try await feed
+        let serviceAlerts = await alerts ?? previous?.serviceAlerts
+        try Task.checkCancellation()
+        let origin = here?.coordinate ?? savedWalk?.origin.coordinate ?? station.coordinate
         return Plan(stationID: station.id, walkSeconds: walk,
                     departures: withTimetable(fetched.departures(from: station), at: station, now: fetched.fetchedAt),
-                    computedAt: Date(), originLatitude: here.coordinate.latitude,
-                    originLongitude: here.coordinate.longitude)
+                    computedAt: fetched.fetchedAt, originLatitude: origin.latitude, originLongitude: origin.longitude,
+                    walkIsKnown: knownWalk || usingSavedWalk,
+                    locationDate: here?.timestamp ?? savedWalk?.walkMeasuredAt, selectionID: stationID,
+                    predictionDate: fetched.predictionDate(from: station), serviceAlerts: serviceAlerts,
+                    walkIsSaved: usingSavedWalk)
     }
 
     /// PATH posts about one or two trains per direction; the timetable fills in
     /// the ones after. At Newport that's every direction; elsewhere, the line
-    /// through Newport (`Station.timetable`). Other trains show only as posted.
+    /// through Newport (`Station.timetable`). The separate HOB–33 service uses
+    /// its own published timetable at the five Manhattan stations it serves.
     static func withTimetable(_ live: [Departure], at station: Station, now: Date) -> [Departure] {
         let legs: [(Destination, TimeInterval)]
         if station.isHome {
-            legs = station.destinations.map { ($0, 0) }
+            // A separate Newport-to-Hoboken train isn't always in service.
+            // Only the live feed establishes that this departure is running.
+            legs = station.destinations.filter { $0.id != "HOB" }.map { ($0, 0) }
         } else if let leg = station.timetable {
             legs = [(leg.destination, leg.minutesBefore * 60)]
         } else {
@@ -119,7 +207,8 @@ enum Planner {
                           lineColors: like?.lineColors ?? dest.lineColors, scheduled: true)
             }
         }
-        return (live + scheduled).sorted { $0.date < $1.date }
+        let hoboken = HobokenSchedule.projected(after: live, at: station, now: now)
+        return (live + scheduled + hoboken).sorted { $0.date < $1.date }
     }
 
     /// Farther than this from every station (about an hour's walk), there's no
@@ -168,11 +257,12 @@ enum Planner {
         return best
     }
 
-    private static func nearestByWalk(from here: CLLocation) async -> (Station, TimeInterval) {
+    private static func nearestByWalk(from here: CLLocation,
+                                      walk: @escaping (CLLocation, Station) async -> TimeInterval) async -> (Station, TimeInterval) {
         let options = candidates(near: here)
         let walks = await withTaskGroup(of: (Station, TimeInterval).self) { group in
             for station in options {
-                group.addTask { (station, await walkSeconds(from: here, to: station)) }
+                group.addTask { (station, await walk(here, station)) }
             }
             var out: [(Station, TimeInterval)] = []
             for await result in group { out.append(result) }
@@ -241,13 +331,22 @@ struct PathFeed {
         body = try JSONDecoder().decode(Body.self, from: data)
     }
 
+    func predictionDate(from station: Station) -> Date {
+        let messages = body.results.first { $0.consideredStation == station.id }?.destinations.flatMap(\.messages) ?? []
+        return messages.filter { station.shows($0.headSign) }
+            .compactMap { $0.lastUpdated.flatMap(Self.parseStamp) }
+            .filter { $0 <= fetchedAt.addingTimeInterval(5) }
+            .min() ?? fetchedAt
+    }
+
     func departures(from station: Station) -> [Departure] {
         guard let result = body.results.first(where: { $0.consideredStation == station.id }) else { return [] }
         return result.destinations
             .flatMap(\.messages)
             .filter { station.shows($0.headSign) }
             .compactMap { m in
-                guard let seconds = Double(m.secondsToArrival) else { return nil }
+                guard let seconds = Double(m.secondsToArrival), seconds.isFinite,
+                      seconds >= 0, seconds <= 86400 else { return nil }
                 return Departure(date: Self.postedAt(m.lastUpdated, fetchedAt: fetchedAt).addingTimeInterval(seconds),
                                  headsign: m.headSign,
                                  lineColors: m.lineColor.uppercased())

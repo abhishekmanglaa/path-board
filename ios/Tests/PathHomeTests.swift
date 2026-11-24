@@ -240,7 +240,7 @@ final class TimetableTests: XCTestCase {
         let plan = Plan(stationID: "NEW", walkSeconds: 120, departures: deps, computedAt: weekday,
                         originLatitude: 40.727, originLongitude: -74.034)
         let rows = BoardSnapshot(plan: plan, at: weekday, showing: Destination.newport).rows
-        XCTAssertEqual(rows.map(\.id), ["WTC", "33", "JSQ", "HOB"])
+        XCTAssertEqual(rows.map(\.id), ["WTC", "33", "JSQ"])
         for row in rows { XCTAssertEqual(row.trains.count, 3, row.id) }
         XCTAssertEqual(rows[0].trains.map(\.scheduled), [false, true, true])
         XCTAssertEqual(rows[1].trains.map(\.departure.lineColors), Array(repeating: "4D92FB,FF9900", count: 3))
@@ -252,7 +252,7 @@ final class TimetableTests: XCTestCase {
     }
 
     /// Christopher St: the JSQ–33 line passes Newport, so its posted train is
-    /// followed by timetabled ones; HOB–33 (to Hoboken) shows only as posted.
+    /// followed by timetabled ones; HOB–33 uses its own published timetable.
     func testAwayStationsOnALineThroughNewportGetTimetabledTrains() {
         let chr = Station.byID["CHR"]!
         let jsq = Departure(date: weekday.addingTimeInterval(180), headsign: "Journal Square", lineColors: "FF9900")
@@ -263,7 +263,7 @@ final class TimetableTests: XCTestCase {
         let rows = BoardSnapshot(plan: plan, at: weekday).rows
         XCTAssertEqual(rows.map(\.label), ["JSQ–33", "HOB–33"])
         XCTAssertEqual(rows[0].trains.map(\.scheduled), [false, true, true])
-        XCTAssertEqual(rows[1].trains.map(\.scheduled), [false])
+        XCTAssertEqual(rows[1].trains.map(\.scheduled), [false, true, true])
         // Timetabled trains run on Newport's Journal Sq-bound gaps, shifted with the posted one.
         let gaps = zip(rows[0].trains.dropFirst(), rows[0].trains).map { $0.departure.date.timeIntervalSince($1.departure.date) }
         XCTAssertTrue(gaps.allSatisfy { $0 >= 3 * 60 && $0 <= 12 * 60 }, "\(gaps)")
@@ -274,7 +274,12 @@ final class TimetableTests: XCTestCase {
         let chr = Station.byID["CHR"]!
         let deps = Planner.withTimetable([], at: chr, now: weekday)
         XCTAssertGreaterThanOrEqual(deps.count, 3)
-        XCTAssertTrue(deps.allSatisfy { $0.scheduled && $0.headsign == "Journal Square" && $0.lineColors == "FF9900" })
+        let journal = deps.filter { $0.headsign == "Journal Square" }
+        XCTAssertFalse(journal.isEmpty)
+        XCTAssertTrue(journal.allSatisfy { $0.scheduled && $0.lineColors == "FF9900" })
+        let hoboken = deps.filter { $0.headsign == "Hoboken" }
+        XCTAssertFalse(hoboken.isEmpty)
+        XCTAssertTrue(hoboken.allSatisfy { $0.scheduled && $0.lineColors == "4D92FB" })
         // Newark has no line through Newport, so nothing is invented.
         XCTAssertEqual(Planner.withTimetable([], at: Station.byID["NWK"]!, now: weekday), [])
     }
@@ -344,20 +349,20 @@ final class TimelineTests: XCTestCase {
         let lots = Plan.sample(at: now, minutes: [30, 40, 50, 60])
         XCTAssertEqual(TimelineBuilder.reloadDate(for: lots, from: now), now.addingTimeInterval(TimelineBuilder.maxReloadInterval))
         // Two left: refetch as the first leaves (only one would remain).
-        let two = Plan.sample(at: now, minutes: [8, 18])
+        let two = Plan.sample(at: now, minutes: [12, 18])
         XCTAssertEqual(TimelineBuilder.reloadDate(for: two, from: now), two.departures[0].date)
         // Never sooner than the floor.
         let soon = Plan.sample(at: now, minutes: [1, 2])
         XCTAssertEqual(TimelineBuilder.reloadDate(for: soon, from: now), now.addingTimeInterval(TimelineBuilder.minReloadInterval))
         let none = Plan.sample(at: now, minutes: [])
-        XCTAssertEqual(TimelineBuilder.reloadDate(for: none, from: now), now.addingTimeInterval(TimelineBuilder.minReloadInterval))
+        XCTAssertEqual(TimelineBuilder.reloadDate(for: none, from: now), now.addingTimeInterval(TimelineBuilder.maxReloadInterval))
     }
 
     /// Timetabled trains never keep the widget from refetching live ones.
     func testReloadIgnoresTimetabledTrains() {
         let weekday = Date(timeIntervalSince1970: 1_793_626_200)
-        let live = [Departure(date: weekday.addingTimeInterval(400), headsign: "33rd Street", lineColors: "FF9900"),
-                    Departure(date: weekday.addingTimeInterval(500), headsign: "World Trade Center", lineColors: "65C100")]
+        let live = [Departure(date: weekday.addingTimeInterval(660), headsign: "33rd Street", lineColors: "FF9900"),
+                    Departure(date: weekday.addingTimeInterval(780), headsign: "World Trade Center", lineColors: "65C100")]
         let plan = Plan(stationID: "NEW", walkSeconds: 150,
                         departures: Planner.withTimetable(live, at: Station.byID["NEW"]!, now: weekday), computedAt: weekday,
                         originLatitude: 40.727, originLongitude: -74.034)
@@ -425,7 +430,9 @@ final class HomeAndLinkTests: XCTestCase {
 
     func testFreshPlanFromSameSpotIsReusedWithoutNetwork() async throws {
         let previous = Plan.sample(at: now)
-        let nearby = CLLocation(latitude: previous.originLatitude + 0.0003, longitude: previous.originLongitude)
+        let nearby = CLLocation(coordinate: CLLocationCoordinate2D(latitude: previous.originLatitude + 0.0003,
+                                longitude: previous.originLongitude), altitude: 0, horizontalAccuracy: 10,
+                                verticalAccuracy: -1, timestamp: now)
         let plan = try await Planner.plan(from: nearby, previous: previous, now: now.addingTimeInterval(30))
         XCTAssertEqual(plan.computedAt, previous.computedAt)
     }
